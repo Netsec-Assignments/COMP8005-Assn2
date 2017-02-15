@@ -14,6 +14,6 @@
  * @param port   The port on which to listen for connections.
  * @return 0 on success, or -1 on failure with errno set appropriately.
  */
-int start_acceptor(server_t* server, short port);
+int start_acceptor(server_t* server, unsigned short port);
 
 #endif //COMP8005_ASSN2_ACCEPT_H

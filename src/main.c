@@ -4,8 +4,9 @@
 #include <getopt.h>
 #include <stdlib.h>
 #include <string.h>
-#include "server.h"
-#include "acceptor.h"
+#include <stdint.h>
+#include "assn2/server.h"
+#include "assn2/acceptor.h"
 
 #define DEFAULT_PORT 8005
 
@@ -22,7 +23,7 @@ void print_usage(char const* name)
 
 int main(int argc, char** argv)
 {
-    short port = DEFAULT_PORT;
+    unsigned short port = DEFAULT_PORT;
     server_t* server = epoll_server;
 
     char const* short_opts = "p:s:h";
@@ -43,12 +44,17 @@ int main(int argc, char** argv)
             {
                 case 'p':
                 {
-                    int num_read = sscanf(optarg, "%hu", &port);
-                    if (num_read != 1)
+                    unsigned int port_int;
+                    int num_read = sscanf(optarg, "%u", &port_int);
+                    if (num_read != 1 || port_int > UINT16_MAX)
                     {
                         fprintf(stderr, "Invalid port number %s.\n", optarg);
                         print_usage(argv[0]);
                         exit(EXIT_FAILURE);
+                    }
+                    else
+                    {
+                        port = (unsigned short)port_int;
                     }
                 }
                 break;
@@ -60,7 +66,7 @@ int main(int argc, char** argv)
                     }
                     else if (strcmp(optarg, "select") == 0)
                     {
-                        server == select_server;
+                        server = select_server;
                     }
                     else if (strcmp(optarg, "thread") == 0)
                     {
@@ -93,7 +99,6 @@ int main(int argc, char** argv)
 
         if (start_acceptor(server, port) == -1)
         {
-            perror("start_acceptor");
             exit(EXIT_FAILURE);
         }
     }
