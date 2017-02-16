@@ -1,3 +1,19 @@
+/*********************************************************************************************
+Name:		main.c
+
+Required:	main.h	
+
+Developer:	Shane Spoor
+
+Created On: 2017-02-17
+
+Description:
+	
+Revisions:
+	(none)
+
+*********************************************************************************************/
+
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -10,6 +26,29 @@
 
 #define DEFAULT_PORT 8005
 
+/*********************************************************************************************
+FUNCTION
+
+Name:		print_usage
+
+Prototype:	void print_usage(char const* name) 
+
+Developer:	Shane Spoor
+
+Created On: 2017-02-17
+
+Parameters:
+    name - name
+
+Return Values:
+	
+Description:
+    Prints usage help when running the application.
+
+Revisions:
+	(none)
+
+*********************************************************************************************/
 void print_usage(char const* name)
 {
     printf("usage: %s [-h] [-p port]\n", name);
@@ -21,6 +60,30 @@ void print_usage(char const* name)
     printf("\t                     Default is epoll.");
 }
 
+/*********************************************************************************************
+FUNCTION
+
+Name:		main
+
+Prototype:	int main(int argc, char** argv) 
+
+Developer:	Shane Spoor
+
+Created On: 2017-02-17
+
+Parameters:
+    argc - Number of arguments
+	argv - Arguments
+
+Return Values:
+	
+Description:
+    Runs the different servers based off the users choice.
+
+Revisions:
+	(none)
+
+*********************************************************************************************/
 int main(int argc, char** argv)
 {
     unsigned short port = DEFAULT_PORT;
