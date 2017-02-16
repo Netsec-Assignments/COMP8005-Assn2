@@ -24,6 +24,7 @@ Revisions:
 #include "assn2/client.h"
 
 #define DEFAULT_PORT 8005
+#define DEFAULT_IP "192.168.0.9"
 
 /*********************************************************************************************
 FUNCTION
@@ -50,11 +51,14 @@ Revisions:
 *********************************************************************************************/
 void print_usage()
 {
-    printf("usage: %s [-h] [-p port]\n");
-    printf("\t-h, --help:          print this help message and exit.\n");
-    printf("\t-p, --port [port]:   the port on which to listen for connections;\n");
-    printf("\t                     default is %u.\n", DEFAULT_PORT);
-    printf("\t-c, --client: the client used to send connections.\n");
+    printf("usage: %s [-h] [-i ip] [-p port] [-c clients]\n");
+    printf("\t-h, --help:               print this help message and exit.\n");
+    printf("\t-i, --ip [ip]             the ip on which the server is on.\n");
+    printf("\t-p, --port [port]:        the port on which to listen for connections;\n");
+    printf("\t-m, --max [max]           the max numbers of requests.\n");
+    printf("\t-n, --clients [clients]   the number of clients to create.\n");
+    printf("\t                          default port is %u.\n", DEFAULT_PORT);
+    printf("\t                          default IP is %u.\n", DEFAULT_IP);
 }
 
 /*********************************************************************************************
@@ -84,14 +88,16 @@ Revisions:
 int main(int argc, char** argv)
 {
     unsigned short port = DEFAULT_PORT;
-    int client = 0;
-    char const* short_opts = "p:c:h";
+    char *ip = DEFAULT_IP;
+    char const* short_opts = "i:p:m:n:h";
     struct option long_opts[] =
     {
-        {"port",   1, NULL, 'p'},
-        {"client", 1, NULL, 'c'},
-        {"help",   0, NULL, 'h'},
-        {0, 0, 0, 0},
+        {"ip",      1, NULL, 'i'},
+        {"port",    1, NULL, 'p'},
+        {"max",     1, NULL, 'm'},
+        {"clients", 1, NULL, 'n'},
+        {"help",    0, NULL, 'h'},
+        {0, 0, 0, 0, 0},
     };
 
     if (argc)
@@ -117,9 +123,20 @@ int main(int argc, char** argv)
                     }
                 }
                 break;
-                case 'c':
+                case 'i':
                 {
-                    client = 1;
+                    char *ip_int;
+                    char *ip_read = sscanf(optarg, "%s", &ip_int);
+                    if (&ip_read != 1)
+                    {
+                        fprintf(stderr, "Invalid IP Address %s.\n", optarg);
+                        print_usage(argv[0]);
+                        exit(EXIT_FAILURE);
+                    }
+                    else
+                    {
+                        ip = *ip_int;
+                    }
                 }
                 break;
                 case 'h':
