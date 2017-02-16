@@ -3,12 +3,12 @@ Name:		main.c
 
 Required:	main.h	
 
-Developer:	Shane Spoor
+Developer:	Mat Siwoski
 
 Created On: 2017-02-17
 
 Description:
-	
+	This is the client application.
 Revisions:
 	(none)
 
@@ -21,10 +21,10 @@ Revisions:
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
-#include "assn2/server.h"
-#include "assn2/acceptor.h"
+#include "assn2/client.h"
 
 #define DEFAULT_PORT 8005
+#define DEFAULT_IP "192.168.0.9"
 
 /*********************************************************************************************
 FUNCTION
@@ -33,7 +33,7 @@ Name:		print_usage
 
 Prototype:	void print_usage(char const* name) 
 
-Developer:	Shane Spoor
+Developer:	Mat Siwoski
 
 Created On: 2017-02-17
 
@@ -49,15 +49,16 @@ Revisions:
 	(none)
 
 *********************************************************************************************/
-void print_usage(char const* name)
+void print_usage()
 {
-    printf("usage: %s [-h] [-p port]\n", name);
-    printf("\t-h, --help:          print this help message and exit.\n");
-    printf("\t-p, --port [port]:   the port on which to listen for connections;\n");
-    printf("\t                     default is %u.\n", DEFAULT_PORT);
-    printf("\t-s, --server [name]: the server used to handle connections.\n");
-    printf("\t                     Valid values are thread, select, or epoll.");
-    printf("\t                     Default is epoll.");
+    printf("usage: %s [-h] [-i ip] [-p port] [-c clients]\n");
+    printf("\t-h, --help:               print this help message and exit.\n");
+    printf("\t-i, --ip [ip]             the ip on which the server is on.\n");
+    printf("\t-p, --port [port]:        the port on which to listen for connections;\n");
+    printf("\t-m, --max [max]           the max numbers of requests.\n");
+    printf("\t-n, --clients [clients]   the number of clients to create.\n");
+    printf("\t                          default port is %u.\n", DEFAULT_PORT);
+    printf("\t                          default IP is %u.\n", DEFAULT_IP);
 }
 
 /*********************************************************************************************
@@ -67,7 +68,7 @@ Name:		main
 
 Prototype:	int main(int argc, char** argv) 
 
-Developer:	Shane Spoor
+Developer:	Mat Siwoski
 
 Created On: 2017-02-17
 
@@ -87,15 +88,16 @@ Revisions:
 int main(int argc, char** argv)
 {
     unsigned short port = DEFAULT_PORT;
-    server_t* server = epoll_server;
-
-    char const* short_opts = "p:s:h";
+    char *ip = DEFAULT_IP;
+    char const* short_opts = "i:p:m:n:h";
     struct option long_opts[] =
     {
-        {"port",   1, NULL, 'p'},
-        {"server", 1, NULL, 's'},
-        {"help",   0, NULL, 'h'},
-        {0, 0, 0, 0},
+        {"ip",      1, NULL, 'i'},
+        {"port",    1, NULL, 'p'},
+        {"max",     1, NULL, 'm'},
+        {"clients", 1, NULL, 'n'},
+        {"help",    0, NULL, 'h'},
+        {0, 0, 0, 0, 0},
     };
 
     if (argc)
@@ -121,25 +123,19 @@ int main(int argc, char** argv)
                     }
                 }
                 break;
-                case 's':
+                case 'i':
                 {
-                    if (strcmp(optarg, "epoll") == 0)
+                    char *ip_int;
+                    char *ip_read = sscanf(optarg, "%s", &ip_int);
+                    if (&ip_read != 1)
                     {
-                        server = epoll_server;
-                    }
-                    else if (strcmp(optarg, "select") == 0)
-                    {
-                        server = select_server;
-                    }
-                    else if (strcmp(optarg, "thread") == 0)
-                    {
-                        server = thread_server;
+                        fprintf(stderr, "Invalid IP Address %s.\n", optarg);
+                        print_usage(argv[0]);
+                        exit(EXIT_FAILURE);
                     }
                     else
                     {
-                        fprintf(stderr, "Invalid server %s.\n", optarg);
-                        print_usage(argv[0]);
-                        exit(EXIT_FAILURE);
+                        ip = *ip_int;
                     }
                 }
                 break;
@@ -160,7 +156,7 @@ int main(int argc, char** argv)
             }
         }
 
-        if (start_acceptor(server, port) == -1)
+        if (start_acceptor(client, port) == -1)
         {
             exit(EXIT_FAILURE);
         }
