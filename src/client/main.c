@@ -21,74 +21,81 @@ Revisions:
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
-#include "assn2/client.h"
+#include "client.h"
 
 #define DEFAULT_PORT 8005
 #define DEFAULT_IP "192.168.0.9"
+#define DEFAULT_NUMBER_CLIENTS 1
+#define DEFAULT_MAXIMUM_REQUESTS 1
+
 
 /*********************************************************************************************
 FUNCTION
 
-Name:		print_usage
+    Name:		print_usage
 
-Prototype:	void print_usage(char const* name) 
+    Prototype:	void print_usage(char const* name) 
 
-Developer:	Mat Siwoski
+    Developer:	Mat Siwoski
 
-Created On: 2017-02-17
+    Created On: 2017-02-17
 
-Parameters:
+    Parameters:
     name - name
 
-Return Values:
+    Return Values:
 	
-Description:
+    Description:
     Prints usage help when running the application.
 
-Revisions:
+    Revisions:
 	(none)
 
 *********************************************************************************************/
-void print_usage()
+void print_usage(char const* name)
 {
-    printf("usage: %s [-h] [-i ip] [-p port] [-c clients]\n");
+    printf("usage: %s [-h] [-i ip] [-p port] [-c clients]\n", name);
     printf("\t-h, --help:               print this help message and exit.\n");
     printf("\t-i, --ip [ip]             the ip on which the server is on.\n");
     printf("\t-p, --port [port]:        the port on which to listen for connections;\n");
     printf("\t-m, --max [max]           the max numbers of requests.\n");
     printf("\t-n, --clients [clients]   the number of clients to create.\n");
-    printf("\t                          default port is %u.\n", DEFAULT_PORT);
-    printf("\t                          default IP is %u.\n", DEFAULT_IP);
+    printf("\t                          default port is %d.\n", DEFAULT_PORT);
+    printf("\t                          default IP is %s.\n", DEFAULT_IP);
+    printf("\t                          default number of clients is %d.\n", DEFAULT_NUMBER_CLIENTS);
+    printf("\t                          default number of max requests is %d.\n", DEFAULT_MAXIMUM_REQUESTS);
 }
 
 /*********************************************************************************************
 FUNCTION
 
-Name:		main
+    Name:		main
 
-Prototype:	int main(int argc, char** argv) 
+    Prototype:	int main(int argc, char** argv) 
 
-Developer:	Mat Siwoski
+    Developer:	Mat Siwoski
 
-Created On: 2017-02-17
+    Created On: 2017-02-17
 
-Parameters:
+    Parameters:
     argc - Number of arguments
 	argv - Arguments
 
-Return Values:
+    Return Values:
 	
-Description:
+    Description:
     Runs the different servers based off the users choice.
 
-Revisions:
+    Revisions:
 	(none)
 
 *********************************************************************************************/
 int main(int argc, char** argv)
 {
-    unsigned short port = DEFAULT_PORT;
-    char *ip = DEFAULT_IP;
+    unsigned int port = DEFAULT_PORT;
+    char* ip = DEFAULT_IP;
+    unsigned int maxRequests = DEFAULT_MAXIMUM_REQUESTS;
+    unsigned int numOfClients = DEFAULT_NUMBER_CLIENTS;
     char const* short_opts = "i:p:m:n:h";
     struct option long_opts[] =
     {
@@ -97,7 +104,7 @@ int main(int argc, char** argv)
         {"max",     1, NULL, 'm'},
         {"clients", 1, NULL, 'n'},
         {"help",    0, NULL, 'h'},
-        {0, 0, 0, 0, 0},
+        {0, 0, 0, 0},
     };
 
     if (argc)
@@ -119,15 +126,15 @@ int main(int argc, char** argv)
                     }
                     else
                     {
-                        port = (unsigned short)port_int;
+                        port = (unsigned int)port_int;
                     }
                 }
                 break;
                 case 'i':
                 {
-                    char *ip_int;
-                    char *ip_read = sscanf(optarg, "%s", &ip_int);
-                    if (&ip_read != 1)
+                    char* ip_int;
+                    char* ip_read = sscanf(optarg, "%s", &ip_int);
+                    if (&ip_read != "\0"
                     {
                         fprintf(stderr, "Invalid IP Address %s.\n", optarg);
                         print_usage(argv[0]);
@@ -135,7 +142,39 @@ int main(int argc, char** argv)
                     }
                     else
                     {
-                        ip = *ip_int;
+                        ip = ip_int;
+                    }
+                }
+                break;
+                case 'm':
+                {
+                    unsigned int maxRequests_int;
+                    int maxRequests_read = sscanf(optarg, "%d", &maxRequests_int);
+                    if( maxRequests_read != 1)
+                    {
+                        fprintf(stderr, "Invalid number of Max Requests %s.\n", optarg);
+                        print_usage(argv[0]);
+                        exit(EXIT_FAILURE);
+                    }
+                    else
+                    {
+                        maxRequests = (unsigned int)maxRequests_int;
+                    }
+                }                    
+                break;
+                case 'n':
+                {
+                    unsigned int numOfClients_int;
+                    int numOfClients_read = sscanf(optarg, "%d", &numOfClients_int);
+                    if(numOfClients_read != 1)
+                    {
+                        fprintf(stderr, "Invalid number of clients %s.\n", optarg);
+                        print_usage(argv[0]);
+                        exit(EXIT_FAILURE);
+                    }
+                    else
+                    {
+                        numOfClients = (unsigned int)numOfClients_int;
                     }
                 }
                 break;
@@ -155,10 +194,16 @@ int main(int argc, char** argv)
                 break;
             }
         }
-
-        if (start_acceptor(client, port) == -1)
+        
+        if (start_client(ip, port, maxRequests, numOfClients) == -1)
         {
             exit(EXIT_FAILURE);
         }
     }
+}
+
+
+int start_client(char* ip, unsigned int port, unsigned int maxRequests, unsigned int numOfClients)
+{
+    return 1;
 }
