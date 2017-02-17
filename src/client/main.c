@@ -20,6 +20,7 @@ Revisions:
 #include <getopt.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
 #include <stdint.h>
 #include "client.h"
 
@@ -27,7 +28,7 @@ Revisions:
 #define DEFAULT_IP "192.168.0.9"
 #define DEFAULT_NUMBER_CLIENTS 1
 #define DEFAULT_MAXIMUM_REQUESTS 1
-
+#define NETWORK_BUFFER_SIZE 1024
 
 /*********************************************************************************************
 FUNCTION
@@ -92,10 +93,8 @@ FUNCTION
 *********************************************************************************************/
 int main(int argc, char** argv)
 {
-    unsigned int port = DEFAULT_PORT;
-    char* ip = DEFAULT_IP;
-    unsigned int maxRequests = DEFAULT_MAXIMUM_REQUESTS;
-    unsigned int numOfClients = DEFAULT_NUMBER_CLIENTS;
+
+    client_info client_datas;
     char const* short_opts = "i:p:m:n:h";
     struct option long_opts[] =
     {
@@ -106,6 +105,12 @@ int main(int argc, char** argv)
         {"help",    0, NULL, 'h'},
         {0, 0, 0, 0},
     };
+
+    client_datas.port = DEFAULT_PORT;
+    client_datas.ip = DEFAULT_IP;
+    client_datas.maxRequests = DEFAULT_MAXIMUM_REQUESTS;
+    client_datas.numOfClients = DEFAULT_NUMBER_CLIENTS;
+    
 
     if (argc)
     {
@@ -126,7 +131,7 @@ int main(int argc, char** argv)
                     }
                     else
                     {
-                        port = (unsigned int)port_int;
+                        client_datas.port = (unsigned int)port_int;
                     }
                 }
                 break;
@@ -134,7 +139,7 @@ int main(int argc, char** argv)
                 {
                     char* ip_int;
                     char* ip_read = sscanf(optarg, "%s", &ip_int);
-                    if (&ip_read != "\0"
+                    if (&ip_read != "\0")
                     {
                         fprintf(stderr, "Invalid IP Address %s.\n", optarg);
                         print_usage(argv[0]);
@@ -142,7 +147,7 @@ int main(int argc, char** argv)
                     }
                     else
                     {
-                        ip = ip_int;
+                        client_datas.ip = ip_int;
                     }
                 }
                 break;
@@ -158,7 +163,7 @@ int main(int argc, char** argv)
                     }
                     else
                     {
-                        maxRequests = (unsigned int)maxRequests_int;
+                        client_datas.maxRequests = (unsigned int)maxRequests_int;
                     }
                 }                    
                 break;
@@ -174,7 +179,7 @@ int main(int argc, char** argv)
                     }
                     else
                     {
-                        numOfClients = (unsigned int)numOfClients_int;
+                        client_datas.numOfClients = (unsigned int)numOfClients_int;
                     }
                 }
                 break;
@@ -195,7 +200,7 @@ int main(int argc, char** argv)
             }
         }
         
-        if (start_client(ip, port, maxRequests, numOfClients) == -1)
+        if (start_client(client_datas) == -1)
         {
             exit(EXIT_FAILURE);
         }
@@ -203,7 +208,186 @@ int main(int argc, char** argv)
 }
 
 
-int start_client(char* ip, unsigned int port, unsigned int maxRequests, unsigned int numOfClients)
+int start_client(client_info client_datas)
 {
+    int sockets[2];
+    int threads = 10;
+    int count = 0;
+    client_info data[threads];
+    pthread_t thread = 0;
+    pthread_attr_t attribute;
+
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) == -1)
+    {
+        fprintf(stderr, "Unable to create socket pair`");
+        return -1;
+    }
+
+    pthread_attr_init(&attribute);
+    
+    if (pthread_attr_setdetachstate(&attribute, PTHREAD_CREATE_DETACHED) != 0)
+    {
+        fprintf(stderr, "Thread Attributes unable to be set to detached.");
+        return -1;
+    }
+
+    if (pthread_attr_setscope(&attribute, PTHREAD_SCOPE_SYSTEM) != 0)
+    {
+        fprintf(stderr,"System Scopen unable to be set to thread.");
+        return -1;
+    }
+    
+    for (count = 0; count < threads; count++)
+    {
+        memcpy(&data[count], &client_datas, sizeof(client_datas));
+    }
+
+    for (count = 0; count < threads; count++)
+    {
+        if (pthread_create(&thread, &attribute, clients, (void *) &data[count]) != 0)
+        {
+            fprintf(stderr, "Unable to create thread.");
+            return -1;
+        }
+    }
+ 
+    pthread_attr_destroy(&attribute);
+    
+    wait(&count);
+
     return 1;
+}
+
+void* clients(void* infos)
+{
+    int* sockets = 0;
+    char* buffer = 0;
+    int count = 0;
+    int index = 0;
+    int result = 0;
+    char request[NETWORK_BUFFER_SIZE];
+    client_info *data = (client_info *)infos;
+
+    if ((buffer = malloc(sizeof(char) * NETWORK_BUFFER_SIZE)) == NULL)
+    {
+        fprintf(stderr, "Unable to allocate buffer memory.");
+        return -1;
+    }
+    if ((sockets = malloc(sizeof(int) * data->numOfClients)) == NULL)
+    {
+        fprintf(stderr, "Unable to allocate socket memory.");
+        return -1;
+    }
+
+    for (index = 0; index < data->numOfClients; index++)
+    {      
+        /* Create a socket and connect to the server */
+        result = connectToServer(data->port, &sockets[index], data->ip);
+        
+        /* Set the socket to reuse for improper shutdowns */
+        if ((result == -1) || (setReuse(&sockets[index]) == -1))
+        {
+            break;
+        }
+    }
+
+    if (result != -1)
+    {
+        while (1)
+        {
+            count++;
+            
+            for (index = 0; index < data->numOfClients; index++)
+            {
+                if (sendData(&sockets[index], request, strlen(request)) == -1)
+                {
+                    continue;
+                }
+
+            }
+
+            if (count >= data->maxRequests)
+            {
+                break;
+            }
+        }
+    }
+
+    for (index = 0; index < data->numOfClients; index++)
+    {
+        closeSocket(&sockets[index]);
+    }
+
+    free(buffer);
+    
+    pthread_exit(NULL);
+}
+
+int connectToServer(const char *port, int *sock, const char *ip)
+{
+    struct addrinfo serverInfo;
+    struct addrinfo *result;
+    struct addrinfo *rp;
+    
+    memset(&serverInfo, 0, sizeof(serverInfo));
+    serverInfo.ai_family = AF_INET;
+    serverInfo.ai_socktype = SOCK_STREAM;
+
+    if (getaddrinfo(ip, port, &serverInfo, &result) != 0)
+    {
+        return -1;
+    }
+        
+    for (rp = result; rp != NULL; rp = rp->ai_next)
+    {
+        *sock = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+        
+        if (*sock == -1)
+            continue;
+        
+        if (connect(*sock, rp->ai_addr, rp->ai_addrlen) != -1)
+            break;    
+
+        close(*sock);
+    }
+    
+    if (rp == NULL)
+    {
+        return -1;
+    }
+    
+    freeaddrinfo(result);
+    
+    return *sock;
+}
+
+int setReuse(int* socket)
+{
+    socklen_t optlen = 1;
+    return setsockopt(*socket, SOL_SOCKET, SO_REUSEADDR, &optlen, sizeof(optlen));
+}
+
+int closeSocket(int* socket)
+{
+    return close(*socket);
+}
+
+int sendData(int *socket, const char *buffer, int bytesToSend)
+{
+    int sent = 0;
+    int sentTotal = 0;
+    int bytesLeft = bytesToSend;
+    
+    while (sent < bytesToSend)
+    {
+        sent = send(*socket, buffer + sentTotal, bytesLeft, 0);
+        if (sent == -1)
+        {
+            return -1;
+        }
+        sentTotal += sent;
+        bytesLeft = bytesToSend - sentTotal;
+    }
+    
+    return sent;
 }
