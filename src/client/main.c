@@ -17,11 +17,16 @@ Revisions:
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/wait.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <getopt.h>
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
 #include <stdint.h>
+#include <unistd.h> 
 #include "client.h"
 
 #define DEFAULT_PORT 8005
@@ -138,8 +143,8 @@ int main(int argc, char** argv)
                 case 'i':
                 {
                     char* ip_int;
-                    char* ip_read = sscanf(optarg, "%s", &ip_int);
-                    if (&ip_read != "\0")
+                    char* ip_read = sscanf(optarg, "%s", ip_int);
+                    if (ip_read  == NULL || ip_read[0] == '\0')
                     {
                         fprintf(stderr, "Invalid IP Address %s.\n", optarg);
                         print_usage(argv[0]);
@@ -271,12 +276,12 @@ void* clients(void* infos)
     if ((buffer = malloc(sizeof(char) * NETWORK_BUFFER_SIZE)) == NULL)
     {
         fprintf(stderr, "Unable to allocate buffer memory.");
-        return -1;
+        return 0;
     }
     if ((sockets = malloc(sizeof(int) * data->numOfClients)) == NULL)
     {
         fprintf(stderr, "Unable to allocate socket memory.");
-        return -1;
+        return 0;
     }
 
     for (index = 0; index < data->numOfClients; index++)
@@ -325,15 +330,15 @@ void* clients(void* infos)
 
 int connectToServer(const char *port, int *sock, const char *ip)
 {
-    struct addrinfo serverInfo;
+    struct addrinfo hints;
     struct addrinfo *result;
     struct addrinfo *rp;
     
-    memset(&serverInfo, 0, sizeof(serverInfo));
-    serverInfo.ai_family = AF_INET;
-    serverInfo.ai_socktype = SOCK_STREAM;
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
 
-    if (getaddrinfo(ip, port, &serverInfo, &result) != 0)
+    if (getaddrinfo(ip, port, &hints, &result) != 0)
     {
         return -1;
     }
