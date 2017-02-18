@@ -15,14 +15,11 @@ Revisions:
 *********************************************************************************************/
 
 #include <stdio.h>
-#include <sys/types.h>
-#include <sys/socket.h>
 #include <getopt.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 #include "server.h"
-#include "acceptor.h"
 
 #define DEFAULT_PORT 8005
 
@@ -87,7 +84,7 @@ Revisions:
 int main(int argc, char** argv)
 {
     unsigned short port = DEFAULT_PORT;
-    server_t* server = epoll_server;
+    server_t* server = thread_server;
 
     char const* short_opts = "p:s:h";
     struct option long_opts[] =
@@ -160,9 +157,10 @@ int main(int argc, char** argv)
             }
         }
 
-        if (start_acceptor(server, port) == -1)
+        if (serve(server, port) == -1)
         {
             exit(EXIT_FAILURE);
         }
     }
+    return EXIT_SUCCESS;
 }

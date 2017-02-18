@@ -5,7 +5,12 @@
 #ifndef COMP8005_ASSN2_SERVER_H
 #define COMP8005_ASSN2_SERVER_H
 
+#include <stdatomic.h>
 #include <netinet/in.h>
+#include "client.h"
+#include "acceptor.h"
+
+extern atomic_int done;
 
 typedef struct server_t server_t;
 
@@ -16,13 +21,17 @@ extern server_t* epoll_server;
 struct server_t
 {
     /**
-     * Sets up the server (pre-allocates threads, creates select/epoll fds, etc.).
+     * Starts the server (pre-allocates threads, creates select/epoll fds, etc.). This may also
+     * handle accepting connections, in which case it will not return until the server is finished
+     * (the done variable will be set in this case).
      *
-     * @param server The server to initialise.
+     * @param server   The server to initialise.
+     * @param acceptor The acceptor, which should by this point have a bound socket with listen()
+     *                 called on it.
      *
      * @return 0 on success, -1 on failure with errno set appropriately.
      */
-    int (*init)(server_t* server);
+    int (*start)(server_t *server, acceptor_t *acceptor, int *handles_accept);
 
     /**
      * Adds a client to the server. This function should return quickly so that the accept thread can resume accepting
@@ -46,5 +55,14 @@ struct server_t
     // Data private to the server implementation (reference to thread pool, queue for receiving new clients, etc.)
     void* private;
 };
+
+/**
+ * Starts accepting connections and relaying them to the provided server.
+ *
+ * @param server The server used to handle each connection.
+ * @param port   The port on which to listen for connections.
+ * @return 0 on success, or -1 on failure with errno set appropriately.
+ */
+int serve(server_t *server, unsigned short port);
 
 #endif //COMP8005_ASSN2_SERVER_H
