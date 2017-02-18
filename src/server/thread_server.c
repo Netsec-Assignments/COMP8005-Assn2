@@ -5,21 +5,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
-#include <assn2/util/vector.h>
 #include <netdb.h>
 
-#include "assn2/util/vector.h"
-#include "assn2/util/ring_buffer.h"
-#include "assn2/server/server.h"
-#include "assn2/server/client.h"
-
-typedef struct
-{
-    struct sockaddr_in peer;
-    int sock;
-} client_t;
-.h"
-#include "assn2/server/server.h"
+#include "vector.h"
+#include "ring_buffer.h"
+#include "server.h"
+#include "client.h"
 
 static const unsigned int WORKER_POOL_SIZE = 200;
 

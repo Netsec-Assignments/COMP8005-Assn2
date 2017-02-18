@@ -3,7 +3,7 @@
 //
 
 #include <stddef.h>
-#include "assn2/server/server.h"
+#include "server.h"
 
 static server_t select_server_impl =
 {

@@ -5,3 +5,4 @@ project(COMP8005-Assn2)
 
 add_subdirectory(src/server)
 add_subdirectory(src/util)
+add_subdirectory(src/client)

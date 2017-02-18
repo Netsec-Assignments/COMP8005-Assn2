@@ -23,7 +23,7 @@ void ring_buffer_put(ring_buffer_t* buf, void* item)
         size_t diff = tail - head; // This will eventually wrap around, but we're unlikely to hit that case ¯\_(ツ)_/¯
 
         if (diff < buf->size &&
-            atomic_compare_exchange_strong(&buf->tail, tail, tail + 1))
+            atomic_compare_exchange_strong(&buf->tail, &tail, tail + 1))
         {
             // There was space for another element in the buffer and we successfully added to tail,
             // so we can safely write to the buffer... probably

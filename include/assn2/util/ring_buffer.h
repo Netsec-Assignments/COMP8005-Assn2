@@ -6,7 +6,7 @@ typedef struct
 {
     atomic_size_t head;
     atomic_size_t tail;
-    atomic_int_t reader_guard; // Makes sure that the reader doesn't read partially-written data if it catches up to writers
+    atomic_int reader_guard; // Makes sure that the reader doesn't read partially-written data if it catches up to writers
 
     void* mem; // Should probably be a static fixed-size buffer since it will never be freed
     size_t size;
