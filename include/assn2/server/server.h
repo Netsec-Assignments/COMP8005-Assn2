@@ -5,9 +5,12 @@
 #ifndef COMP8005_ASSN2_SERVER_H
 #define COMP8005_ASSN2_SERVER_H
 
+#include <stdatomic.h>
 #include <netinet/in.h>
 #include "client.h"
 #include "acceptor.h"
+
+extern atomic_int done;
 
 typedef struct server_t server_t;
 

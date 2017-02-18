@@ -15,8 +15,6 @@ static const unsigned int WORKER_POOL_SIZE = 200;
 #define CLIENT_BACKLOG_SIZE 100
 static client_t client_backlog_buf[CLIENT_BACKLOG_SIZE];
 
-static atomic_int done = 0;
-
 typedef struct
 {
     atomic_int busy;
@@ -43,7 +41,7 @@ static void* worker_func(void* void_params)
     while (1)
     {
         int done_local;
-        while(!atomic_load(&params->busy) && !(done = atomic_load(&done)));
+        while(!atomic_load(&params->busy) && !(done_local = atomic_load(&done)));
         if (done_local)
         {
             break;
@@ -66,13 +64,11 @@ static void accept_loop(server_t* server, acceptor_t* acceptor)
         int result = accept_client(acceptor, &next_client);
         if (result == -1)
         {
-            // TODO: Error handling ;)
             break;
         }
 
         if (server->add_client(server, next_client) == -1)
         {
-            // TODO: Error handling ;)
             break;
         }
     }
@@ -106,7 +102,7 @@ int thread_server_start(server_t *thread_server, acceptor_t *acceptor, int *hand
             break;
         }
         params->busy = 0;
-        vector_push_back(&priv->worker_params_list, params);
+        vector_push_back(&priv->worker_params_list, &params);
     }
     if (i != WORKER_POOL_SIZE)
     {
@@ -143,7 +139,9 @@ int thread_server_start(server_t *thread_server, acceptor_t *acceptor, int *hand
         return -1;
     }
 
+    thread_server->private = priv;
     accept_loop(thread_server, acceptor);
+    return 0;
 }
 
 static int thread_server_add_client(server_t* server, client_t client)
@@ -172,6 +170,7 @@ static int thread_server_add_client(server_t* server, client_t client)
         new_params = malloc(sizeof(worker_params));
         if (!new_params || (vector_push_back(&private->worker_params_list, &new_params) == -1))
         {
+            atomic_store(&done, 1);
             free(new_params);
             return -1;
         }
@@ -183,7 +182,9 @@ static int thread_server_add_client(server_t* server, client_t client)
         if(pthread_create(&new_thread, NULL, worker_func, new_params) == -1 ||
            pthread_detach(new_thread) == -1)
         {
+            atomic_store(&done, 1);
             free(new_params);
+            return -1;
         }
     }
 

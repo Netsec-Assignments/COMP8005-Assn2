@@ -6,16 +6,23 @@
 #include <netinet/in.h>
 #include <stdio.h>
 #include <netdb.h>
-#include "acceptor.h"
+#include <unistd.h>
+#include <errno.h>
+#include <stdatomic.h>
+#include "server.h"
 
 int accept_client(acceptor_t* acceptor, client_t* out)
 {
     struct sockaddr_in peer;
     socklen_t accepted_len = sizeof(peer);
     int peer_sock = accept(acceptor->sock, (struct sockaddr*)&peer, &accepted_len);
-    if (peer_sock == -1)
+    if (peer_sock < 0)
     {
-        perror("accept");
+        if (errno != EINTR)
+        {
+            perror("accept");
+        }
+        atomic_store(&done, 1);
         return -1;
     }
 
@@ -27,5 +34,6 @@ int accept_client(acceptor_t* acceptor, client_t* out)
 void cleanup_acceptor(acceptor_t* acceptor)
 {
     shutdown(acceptor->sock, 0);
+    close(acceptor->sock);
     freeaddrinfo(acceptor->info);
 }

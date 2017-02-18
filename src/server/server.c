@@ -11,17 +11,25 @@
 #include "acceptor.h"
 #include "server.h"
 
-static __sig_atomic_t done = 0;
+atomic_int done = 0;
+static __sig_atomic_t handled = 0;
 static void nonfatal_sighandler(int sig)
 {
-    done = 1;
+    atomic_store(&done, 1);
+    handled = 1;
 }
 
 int serve(server_t *server, unsigned short port)
 {
-    // Set up signal handlers for Ctrl + C and Ctrl + D
-    signal(SIGINT, nonfatal_sighandler);
-    signal(SIGTERM, nonfatal_sighandler);
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(struct sigaction));
+    sa.sa_handler = nonfatal_sighandler;
+    sigemptyset(&sa.sa_mask);
+
+    // Set up signal handlers so that we can interrupt system calls on signal
+    sigaction(SIGQUIT, &sa, 0);
+    sigaction(SIGINT, &sa, 0);
+    sigaction(SIGTERM, &sa, 0);
 
     acceptor_t acceptor;
 
@@ -36,15 +44,15 @@ int serve(server_t *server, unsigned short port)
     // TODO: Just pass in the port string from argv instead of this nonsense
     char buf[5] = {0};
     snprintf(buf, 5, "%hu", port);
-    int result = getaddrinfo(NULL, buf, &hints, &acceptor.info);
-    if (result == -1)
+    if (getaddrinfo(NULL, buf, &hints, &acceptor.info) < 0)
     {
         perror("getaddrinfo");
         return -1;
     }
 
+    acceptor.port = port;
     acceptor.sock = socket(acceptor.info->ai_family, acceptor.info->ai_socktype, acceptor.info->ai_protocol);
-    if (acceptor.sock == -1)
+    if (acceptor.sock < 0)
     {
         perror("socket");
         freeaddrinfo(acceptor.info);
@@ -52,13 +60,13 @@ int serve(server_t *server, unsigned short port)
     }
 
     int reuse = 1;
-    if (setsockopt(acceptor.sock, SOL_SOCKET, SO_REUSEADDR, &reuse, (socklen_t)sizeof(reuse)) == -1)
+    if (setsockopt(acceptor.sock, SOL_SOCKET, SO_REUSEADDR, &reuse, (socklen_t)sizeof(reuse)) < 0)
     {
         // This isn't a fatal error, so just print the error message and carry on
         perror("setsockopt");
     }
 
-    if (bind(acceptor.sock, acceptor.info->ai_addr, acceptor.info->ai_addrlen) == -1)
+    if (bind(acceptor.sock, acceptor.info->ai_addr, acceptor.info->ai_addrlen) < 0)
     {
         perror("bind");
         cleanup_acceptor(&acceptor);
@@ -81,24 +89,29 @@ int serve(server_t *server, unsigned short port)
     if (!handles_accept)
     {
         // TODO: Need to find a way to set done in the handles_accept case (i.e. every case)
-        while(!done)
+        while(1)
         {
             client_t client;
             if (accept_client(&acceptor, &client) == -1)
             {
-                server->cleanup(server);
-                cleanup_acceptor(&acceptor);
-                return -1;
+                atomic_store(&done, 1);
+                break;
             }
-
-            server->add_client(server, client);
+            else
+            {
+                server->add_client(server, client);
+            }
         }
     }
 
     server->cleanup(server);
     cleanup_acceptor(&acceptor);
 
-    printf("Caught signal, exiting.\n");
+    if (handled)
+    {
+        printf("Caught signal; exiting.\n");
+        fflush(stdout);
+    }
 
-    return 0;
+    return handled ? 0 : -1;
 }
