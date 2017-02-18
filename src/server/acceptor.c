@@ -8,7 +8,7 @@
 #include <signal.h>
 #include <netinet/in.h>
 #include <netdb.h>
-#include "../include/assn2/acceptor.h"
+#include "assn2/server/acceptor.h"
 
 static __sig_atomic_t done = 0;
 static void nonfatal_sighandler(int sig)

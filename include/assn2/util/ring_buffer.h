@@ -1,14 +1,16 @@
-// Convenience macro to get the next item from the ring buffer and cast it to a type
-#define ring_buffer_get_typed(buf, type) (type*)ring_buffer_get(buf)
+#pragma once
+#include <stdatomic.h>
+#include <stddef.h>
 
 typedef struct
 {
     atomic_size_t head;
     atomic_size_t tail;
+    atomic_int_t reader_guard; // Makes sure that the reader doesn't read partially-written data if it catches up to writers
 
-    unsigned char* mem; // Should probably be a static fixed-size buffer since it will never be freed
+    void* mem; // Should probably be a static fixed-size buffer since it will never be freed
     size_t size;
-    size_t elem_size;    
+    size_t elem_size;
 } ring_buffer_t;
 
 /**
@@ -33,8 +35,6 @@ void ring_buffer_put(ring_buffer_t* buf, void* item);
  * Retrieves the next item from the ring buffer. Blocks if there are no items available.
  *
  * @param buf The buffer from which to retrieve the item.
- * @return A pointer to the retrieved element. The caller should copy this value if it will
- *         be cached/used for a long time since the buffer _could_ wrap around and overwrite
- *         the memory in the returned pointer.
+ * @param out Pointer to a variable that will hold the result. Must be >= buf->elem_size.
  */
-void* ring_buffer_get(ring_buffer_t* buf);
+void ring_buffer_get(ring_buffer_t* buf, void* out);

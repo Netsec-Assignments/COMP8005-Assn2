@@ -5,7 +5,7 @@
 #ifndef COMP8005_ASSN2_ACCEPTOR_H
 #define COMP8005_ASSN2_ACCEPTOR_H
 
-#include "server.h"
+#include "assn2/server/server.h"
 
 /**
  * Starts accepting connections and relaying them to the provided server.

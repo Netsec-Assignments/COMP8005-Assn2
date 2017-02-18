@@ -21,8 +21,8 @@ Revisions:
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
-#include "assn2/server.h"
-#include "assn2/acceptor.h"
+#include "assn2/server/server.h"
+#include "assn2/server/acceptor.h"
 
 #define DEFAULT_PORT 8005
 
