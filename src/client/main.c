@@ -389,7 +389,7 @@ void* clients(void* infos)
                 data_received += read;
                 request_time += (end_time.tv_sec * 1000000 + end_time.tv_usec) -
                                (start_time.tv_sec * 1000000 + start_time.tv_usec);
-                printf("%d\n", request_time);
+                
             }
 
             if (count >= data->max_requests)
@@ -397,7 +397,10 @@ void* clients(void* infos)
                 break;
             }
         }
+		
     }
+
+	printf("Total Request Time: %d and Total Data Received: %d\n", request_time,  data_received);
 
     for (index = 0; index < data->num_of_clients; index++)
     {
