@@ -80,7 +80,8 @@ int start_acceptor(server_t* server, unsigned short port)
             server->cleanup(server);
             return -1;
         }
-        server->add_client(server, accepted, peer_sock);
+        client_t client = {accepted, peer_sock};
+        server->add_client(server, client);
     }
 
     server->cleanup(server);

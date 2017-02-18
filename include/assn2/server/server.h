@@ -6,6 +6,7 @@
 #define COMP8005_ASSN2_SERVER_H
 
 #include <netinet/in.h>
+#include "client.h"
 
 typedef struct server_t server_t;
 

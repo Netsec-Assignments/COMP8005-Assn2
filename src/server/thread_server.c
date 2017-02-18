@@ -14,7 +14,7 @@
 
 static const unsigned int WORKER_POOL_SIZE = 200;
 
-static const unsigned int CLIENT_BACKLOG_SIZE = 100;
+#define CLIENT_BACKLOG_SIZE 100
 static client_t client_backlog_buf[CLIENT_BACKLOG_SIZE];
 
 static atomic_int done = 0;
@@ -76,7 +76,7 @@ static void* get_clients_thread_func(void* void_server)
             if (!busy)
             {
                 list[i]->client = next_client;
-                atomic_store_explicit(&params->busy, 1);
+                atomic_store(&params->busy, 1);
                 break;
             }
         }
@@ -112,7 +112,6 @@ error_cleanup:
     // TODO: Log error
     atomic_store(&done, 1);
     vector_free(&private->worker_params_list);
-    getaddrinfo()
     return NULL;
 }
 
