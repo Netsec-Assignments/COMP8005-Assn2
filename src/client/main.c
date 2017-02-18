@@ -1,5 +1,5 @@
 /*********************************************************************************************
-Name:		main.c
+Name:			main.c
 
     Required:	main.h	
 
@@ -8,9 +8,12 @@ Name:		main.c
     Created On: 2017-02-17
 
     Description:
-        This is the client application.
+    This is the client application. This will create the clients that will connect to the
+	servers and will act as a basic echo server. The client will send and receive data and
+	will test the time between to record stats.	
+
     Revisions:
-        (none)
+    (none)
 
 *********************************************************************************************/
 
@@ -59,7 +62,7 @@ FUNCTION
 *********************************************************************************************/
 void print_usage(char const* name)
 {
-    printf("usage: %s [-h] [-i ip] [-p port] [-c clients]\n", name);
+    printf("usage: %s [-h] [-i ip] [-p port] [-m max] [-n clients]\n", name);
     printf("\t-h, --help:               print this help message and exit.\n");
     printf("\t-i, --ip [ip]             the ip on which the server is on.\n");
     printf("\t-p, --port [port]:        the port on which to listen for connections;\n");
@@ -74,7 +77,7 @@ void print_usage(char const* name)
 /*********************************************************************************************
 FUNCTION
 
-    Name:		main
+    Name:	main
 
     Prototype:	int main(int argc, char** argv) 
 
@@ -89,7 +92,9 @@ FUNCTION
     Return Values:
 	
     Description:
-    Runs the different servers based off the users choice.
+    Runs/creates the clients that will connect to the server. This function also accepts the
+	user's inputs to customize the ip/port/max number of requests and the number of clients 
+	to create.
 
     Revisions:
 	(none)
@@ -219,7 +224,30 @@ int main(int argc, char** argv)
     }
 }
 
+/*********************************************************************************************
+FUNCTION
 
+    Name:		start_client
+
+    Prototype:	int start_client(client_info client_datas)
+
+    Developer:	Mat Siwoski
+
+    Created On: 2017-02-17
+
+    Parameters:
+    client_datas - Server Data to connect to.
+
+    Return Values:
+	
+    Description:
+    Start the clients and connect to the server. Create the applicable number of threads dependent
+	on the number of clients that the user wants to connect.
+
+    Revisions:
+	(none)
+
+*********************************************************************************************/
 int start_client(client_info client_datas)
 {
     int sockets[2];
@@ -270,6 +298,30 @@ int start_client(client_info client_datas)
     return 1;
 }
 
+
+/*********************************************************************************************
+FUNCTION
+
+    Name:		connect_to_server
+
+    Prototype:	void* clients(void* infos)
+
+    Developer:	Mat Siwoski
+
+    Created On: 2017-02-17
+
+    Parameters:
+    infos - Server Data to connect to.
+
+    Return Values:
+	
+    Description:
+    Create the clients that the will connect to the server and send/receive data.
+
+    Revisions:
+	(none)
+
+*********************************************************************************************/
 void* clients(void* infos)
 {
     int* sockets = 0;
@@ -356,6 +408,30 @@ void* clients(void* infos)
     pthread_exit(NULL);
 }
 
+/*********************************************************************************************
+FUNCTION
+
+    Name:		connect_to_server
+
+    Prototype:	int connect_to_server(const char *port, const char *ip)
+
+    Developer:	Mat Siwoski
+
+    Created On: 2017-02-17
+
+    Parameters:
+    port - Port to connect to server
+	ip - IP to connect to server
+
+    Return Values:
+	
+    Description:
+    Connect to the server 
+
+    Revisions:
+	(none)
+
+*********************************************************************************************/
 int connect_to_server(const char *port, const char *ip)
 {
     struct addrinfo hints;
@@ -396,12 +472,58 @@ int connect_to_server(const char *port, const char *ip)
     return sock;
 }
 
+/*********************************************************************************************
+FUNCTION
+
+    Name:		set_reuse
+
+    Prototype:	int set_reuse(int* socket)
+
+    Developer:	Mat Siwoski
+
+    Created On: 2017-02-17
+
+    Parameters:
+    socket - Socket
+
+    Return Values:
+	
+    Description:
+    Sets the socket for reuse.
+
+    Revisions:
+	(none)
+
+*********************************************************************************************/
 int set_reuse(int* socket)
 {
     socklen_t optlen = 1;
     return setsockopt(*socket, SOL_SOCKET, SO_REUSEADDR, &optlen, sizeof(optlen));
 }
 
+/*********************************************************************************************
+FUNCTION
+
+    Name:		close_socket
+
+    Prototype:	int close_socket(int* socket)
+
+    Developer:	Mat Siwoski
+
+    Created On: 2017-02-17
+
+    Parameters:
+    socket - Socket
+
+    Return Values:
+	
+    Description:
+    Closes the socket.
+
+    Revisions:
+	(none)
+
+*********************************************************************************************/
 int close_socket(int* socket)
 {
     return close(*socket);
