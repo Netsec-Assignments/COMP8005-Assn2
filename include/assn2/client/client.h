@@ -7,17 +7,17 @@ typedef struct
 {
     char* ip;
     int port;
-    unsigned int numOfClients;
-    unsigned int maxRequests;
+    unsigned int num_of_clients;
+    unsigned int max_requests;
 } client_info;
 
 int start_client(client_info client_datas);
 void print_usage();
 void *clients(void *info);
-
-int sendData(int *socket, const char *buffer, int bytesToSend);
-int closeSocket(int* socket);
-int setReuse(int* socket);
-int connectToServer(const char *port, int *sock, const char *ip);
+int read_data(int *socket, char *buffer, int bytes_to_read);
+int send_data(int *socket, const char *buffer, int bytes_to_send);
+int close_socket(int* socket);
+int set_reuse(int* socket);
+int connect_to_server(const char *port, int *sock, const char *ip);
 
 #endif

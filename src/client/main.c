@@ -1,32 +1,34 @@
 /*********************************************************************************************
 Name:		main.c
 
-Required:	main.h	
+    Required:	main.h	
 
-Developer:	Mat Siwoski
+    Developer:	Mat Siwoski
 
-Created On: 2017-02-17
+    Created On: 2017-02-17
 
-Description:
-	This is the client application.
-Revisions:
-	(none)
+    Description:
+        This is the client application.
+    Revisions:
+        (none)
 
 *********************************************************************************************/
 
-#include <stdio.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/wait.h>
-#include <netdb.h>
-#include <netinet/in.h>
 #include <arpa/inet.h>
 #include <getopt.h>
+#include <pthread.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <pthread.h>
-#include <stdint.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/time.h>
+#include <sys/wait.h>
 #include <unistd.h> 
+
 #include "client.h"
 
 #define DEFAULT_PORT 8005
@@ -113,8 +115,8 @@ int main(int argc, char** argv)
 
     client_datas.port = DEFAULT_PORT;
     client_datas.ip = DEFAULT_IP;
-    client_datas.maxRequests = DEFAULT_MAXIMUM_REQUESTS;
-    client_datas.numOfClients = DEFAULT_NUMBER_CLIENTS;
+    client_datas.max_requests = DEFAULT_MAXIMUM_REQUESTS;
+    client_datas.num_of_clients = DEFAULT_NUMBER_CLIENTS;
     
 
     if (argc)
@@ -158,9 +160,9 @@ int main(int argc, char** argv)
                 break;
                 case 'm':
                 {
-                    unsigned int maxRequests_int;
-                    int maxRequests_read = sscanf(optarg, "%d", &maxRequests_int);
-                    if( maxRequests_read != 1)
+                    unsigned int max_requests_int;
+                    int max_requests_read = sscanf(optarg, "%d", &max_requests_int);
+                    if( max_requests_read != 1)
                     {
                         fprintf(stderr, "Invalid number of Max Requests %s.\n", optarg);
                         print_usage(argv[0]);
@@ -168,15 +170,15 @@ int main(int argc, char** argv)
                     }
                     else
                     {
-                        client_datas.maxRequests = (unsigned int)maxRequests_int;
+                        client_datas.max_requests = (unsigned int)max_requests_int;
                     }
                 }                    
                 break;
                 case 'n':
                 {
-                    unsigned int numOfClients_int;
-                    int numOfClients_read = sscanf(optarg, "%d", &numOfClients_int);
-                    if(numOfClients_read != 1)
+                    unsigned int num_of_clients_int;
+                    int num_of_clients_read = sscanf(optarg, "%d", &num_of_clients_int);
+                    if(num_of_clients_read != 1)
                     {
                         fprintf(stderr, "Invalid number of clients %s.\n", optarg);
                         print_usage(argv[0]);
@@ -184,7 +186,7 @@ int main(int argc, char** argv)
                     }
                     else
                     {
-                        client_datas.numOfClients = (unsigned int)numOfClients_int;
+                        client_datas.num_of_clients = (unsigned int)num_of_clients_int;
                     }
                 }
                 break;
@@ -267,30 +269,35 @@ void* clients(void* infos)
 {
     int* sockets = 0;
     char* buffer = 0;
+    int read = 0;
     int count = 0;
+    int data_received = 0;
+    int request_time = 0;
     int index = 0;
     int result = 0;
     char request[NETWORK_BUFFER_SIZE];
     client_info *data = (client_info *)infos;
+    struct timeval start_time;
+    struct timeval end_time;
 
     if ((buffer = malloc(sizeof(char) * NETWORK_BUFFER_SIZE)) == NULL)
     {
         fprintf(stderr, "Unable to allocate buffer memory.");
         return 0;
     }
-    if ((sockets = malloc(sizeof(int) * data->numOfClients)) == NULL)
+    if ((sockets = malloc(sizeof(int) * data->num_of_clients)) == NULL)
     {
         fprintf(stderr, "Unable to allocate socket memory.");
         return 0;
     }
 
-    for (index = 0; index < data->numOfClients; index++)
+    for (index = 0; index < data->num_of_clients; index++)
     {      
         /* Create a socket and connect to the server */
-        result = connectToServer(data->port, &sockets[index], data->ip);
+        result = connect_to_server(data->port, &sockets[index], data->ip);
         
         /* Set the socket to reuse for improper shutdowns */
-        if ((result == -1) || (setReuse(&sockets[index]) == -1))
+        if ((result == -1) || (set_reuse(&sockets[index]) == -1))
         {
             break;
         }
@@ -302,25 +309,38 @@ void* clients(void* infos)
         {
             count++;
             
-            for (index = 0; index < data->numOfClients; index++)
+            for (index = 0; index < data->num_of_clients; index++)
             {
-                if (sendData(&sockets[index], request, strlen(request)) == -1)
+                gettimeofday(&start_time, NULL);
+
+                if (send_data(&sockets[index], request, strlen(request)) == -1)
                 {
                     continue;
                 }
 
+                if (read = read_data(&sockets[index], request, strlen(request)) == -1)
+                {
+                    continue;
+                }
+
+
+                gettimeofday(&end_time, NULL);
+
+                data_received += read;
+                request_time += (end_time.tv_sec * 1000000 + end_time.tv_usec) -
+                               (start_time.tv_sec * 1000000 + start_time.tv_usec);
             }
 
-            if (count >= data->maxRequests)
+            if (count >= data->max_requests)
             {
                 break;
             }
         }
     }
 
-    for (index = 0; index < data->numOfClients; index++)
+    for (index = 0; index < data->num_of_clients; index++)
     {
-        closeSocket(&sockets[index]);
+        close_socket(&sockets[index]);
     }
 
     free(buffer);
@@ -328,7 +348,7 @@ void* clients(void* infos)
     pthread_exit(NULL);
 }
 
-int connectToServer(const char *port, int *sock, const char *ip)
+int connect_to_server(const char *port, int *sock, const char *ip)
 {
     struct addrinfo hints;
     struct addrinfo *result;
@@ -338,7 +358,7 @@ int connectToServer(const char *port, int *sock, const char *ip)
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
 
-    if (getaddrinfo(ip, port, &hints, &result) != 0)
+    if (getaddrinfo(ip, port, &hints, result) != 0)
     {
         return -1;
     }
@@ -366,33 +386,53 @@ int connectToServer(const char *port, int *sock, const char *ip)
     return *sock;
 }
 
-int setReuse(int* socket)
+int set_reuse(int* socket)
 {
     socklen_t optlen = 1;
     return setsockopt(*socket, SOL_SOCKET, SO_REUSEADDR, &optlen, sizeof(optlen));
 }
 
-int closeSocket(int* socket)
+int close_socket(int* socket)
 {
     return close(*socket);
 }
 
-int sendData(int *socket, const char *buffer, int bytesToSend)
+int send_data(int *socket, const char *buffer, int bytes_to_send)
 {
     int sent = 0;
     int sentTotal = 0;
-    int bytesLeft = bytesToSend;
+    int bytes_left = bytes_to_send;
     
-    while (sent < bytesToSend)
+    while (sent < bytes_to_send)
     {
-        sent = send(*socket, buffer + sentTotal, bytesLeft, 0);
+        sent = send(*socket, buffer + sentTotal, bytes_left, 0);
         if (sent == -1)
         {
             return -1;
         }
         sentTotal += sent;
-        bytesLeft = bytesToSend - sentTotal;
+        bytes_left = bytes_to_send - sentTotal;
     }
     
     return sent;
+}
+
+int read_data(int *socket, char *buffer, int bytes_to_read)
+{
+    int read = 0;
+    int read_total = 0;
+    int bytes_left = bytes_to_read;
+    
+    while (read < bytes_to_read)
+    {
+        read = recv(*socket, buffer + read_total, bytes_left, MSG_WAITALL);
+        if (read == -1)
+        {
+            return -1;
+        }
+        read_total += read;
+        bytes_left = bytes_to_read - read_total;
+    }
+    
+    return read;
 }
