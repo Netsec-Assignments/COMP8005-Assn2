@@ -9,11 +9,19 @@
 #include "vector.h"
 #include "ring_buffer.h"
 #include "server.h"
+#include "protocol.h"
 
 static const unsigned int WORKER_POOL_SIZE = 200;
 
 #define CLIENT_BACKLOG_SIZE 100
 static client_t client_backlog_buf[CLIENT_BACKLOG_SIZE];
+
+typedef struct
+{
+    client_stats_t stats;
+    uint32_t msg_size;
+    char* msg;
+} thread_server_request;
 
 typedef struct
 {
@@ -47,8 +55,17 @@ static void* worker_func(void* void_params)
             break;
         }
 
-        // We got a new client, so handle that
-        //client_stats_t
+        // Handle the new client
+        thread_server_request request;
+
+        if (read_data(params->client.sock, &request.msg_size, sizeof(request.msg_size)) == -1 ||
+            (request.msg = malloc(request.msg_size) == NULL))
+        {
+            atomic_store(&done, 1);
+            break;
+        }
+        read_data(params->client.sock, request.msg, request.msg_size);
+        send_data(params->client.sock, request.msg, request.msg_size);
     }
 
     free(params);

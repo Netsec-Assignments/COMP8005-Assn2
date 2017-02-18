@@ -16,7 +16,7 @@
  * @param bytes_to_send The size of the data to send.
  * @return -1 on error (except EWOULDBLOCK), or the number of bytes successfully sent.
  */
-ssize_t send_data(int sock, const char *buffer, size_t bytes_to_send);
+ssize_t send_data(int sock, const void* buffer, size_t bytes_to_send);
 
 /**
  * Attempts to send all bytes in buffer. If the send produces EWOULDBLOCK, returns the number of bytes
@@ -27,6 +27,6 @@ ssize_t send_data(int sock, const char *buffer, size_t bytes_to_send);
  * @param bytes_to_send The number of bytes to read
  * @return -1 on error (except EWOULDBLOCK), or the number of bytes successfully read.
  */
-ssize_t read_data(int sock, unsigned char *buffer, size_t bytes_to_read);
+ssize_t read_data(int sock, void *buffer, size_t bytes_to_read);
 
 #endif //COMP8005_ASSN2_PROTOCOL_H

@@ -309,6 +309,7 @@ void* clients(void* infos)
         }
     }
 
+    // TODO: Change this to allow concurrent requests
     if (index != data->num_of_clients)
     {
         while (1)
