@@ -9,6 +9,7 @@ typedef struct
     char* port;
     unsigned int num_of_clients;
     unsigned int max_requests;
+    unsigned int num_of_threads;
 } client_info;
 
 int start_client(client_info client_datas);

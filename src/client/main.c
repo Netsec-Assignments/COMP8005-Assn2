@@ -33,9 +33,10 @@ Name:			main.c
 
 #define DEFAULT_PORT "8005"
 #define DEFAULT_IP "192.168.0.9"
-#define DEFAULT_NUMBER_CLIENTS 1
+#define DEFAULT_NUMBER_CLIENTS 1000
 #define DEFAULT_MAXIMUM_REQUESTS 1
 #define NETWORK_BUFFER_SIZE 1024
+#define DEFAULT_THREADS 1000
 
 /*********************************************************************************************
 FUNCTION
@@ -62,16 +63,18 @@ FUNCTION
 *********************************************************************************************/
 void print_usage(char const* name)
 {
-    printf("usage: %s [-h] [-i ip] [-p port] [-m max] [-n clients]\n", name);
+    printf("usage: %s [-h] [-i ip] [-p port] [-m max] [-n clients] [-t threads]\n", name);
     printf("\t-h, --help:               print this help message and exit.\n");
     printf("\t-i, --ip [ip]             the ip on which the server is on.\n");
     printf("\t-p, --port [port]:        the port on which to listen for connections;\n");
     printf("\t-m, --max [max]           the max numbers of requests.\n");
     printf("\t-n, --clients [clients]   the number of clients to create.\n");
+    printf("\t-t, --threads [threads]   the number of clients to create.\n");
     printf("\t                          default port is %s.\n", DEFAULT_PORT);
     printf("\t                          default IP is %s.\n", DEFAULT_IP);
     printf("\t                          default number of clients is %d.\n", DEFAULT_NUMBER_CLIENTS);
     printf("\t                          default number of max requests is %d.\n", DEFAULT_MAXIMUM_REQUESTS);
+    printf("\t                          default number of threads per client is %d.\n", DEFAULT_THREADS);
 }
 
 /*********************************************************************************************
@@ -104,13 +107,14 @@ int main(int argc, char** argv)
 {
 
     client_info client_datas;
-    char const* short_opts = "i:p:m:n:h";
+    char const* short_opts = "i:p:m:n:t:h";
     struct option long_opts[] =
     {
         {"ip",      1, NULL, 'i'},
         {"port",    1, NULL, 'p'},
         {"max",     1, NULL, 'm'},
         {"clients", 1, NULL, 'n'},
+        {"threads", 1, NULL, 't'},
         {"help",    0, NULL, 'h'},
         {0, 0, 0, 0},
     };
@@ -119,7 +123,7 @@ int main(int argc, char** argv)
     client_datas.ip = DEFAULT_IP;
     client_datas.max_requests = DEFAULT_MAXIMUM_REQUESTS;
     client_datas.num_of_clients = DEFAULT_NUMBER_CLIENTS;
-    
+    client_datas.num_of_threads = DEFAULT_THREADS;
 
     if (argc > 1)
     {
@@ -191,6 +195,22 @@ int main(int argc, char** argv)
                     }
                 }
                 break;
+                case 't':
+                {
+                    unsigned int num_of_threads_int;
+                    int num_of_threads_read = sscanf(optarg, "%d", &num_of_threads_int);
+                    if( num_of_threads_read != 1)
+                    {
+                        fprintf(stderr, "Invalid number of Max Requests %s.\n", optarg);
+                        print_usage(argv[0]);
+                        exit(EXIT_FAILURE);
+                    }
+                    else
+                    {
+                        client_datas.max_requests = (unsigned int)num_of_threads_int;
+                    }
+                }                    
+                break;
                 case 'h':
                     print_usage(argv[0]);
                     exit(EXIT_SUCCESS);
@@ -250,18 +270,18 @@ FUNCTION
 *********************************************************************************************/
 int start_client(client_info client_datas)
 {
-    int sockets[2];
-    int threads = 10;
+    // int sockets[2];
+    int threads = client_datas.num_of_threads;
     int count = 0;
     client_info data[threads];
     pthread_t thread = 0;
     pthread_attr_t attribute;
 
-    if (socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) == -1)
-    {
-        fprintf(stderr, "Unable to create socket pair.\n");
-        return -1;
-    }
+    // if (socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) == -1)
+    // {
+    //     fprintf(stderr, "Unable to create socket pair.\n");
+    //     return -1;
+    // }
 
     pthread_attr_init(&attribute);
     
@@ -400,7 +420,8 @@ void* clients(void* infos)
 		
     }
 
-	printf("Total Request Time: %d and Total Data Received: %d\n", request_time,  data_received);
+	// printf("Total Request Time: %d and Total Data Received: %d\n", request_time,  data_received);
+    // fflush(stdout);
 
     for (index = 0; index < data->num_of_clients; index++)
     {
