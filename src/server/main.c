@@ -15,14 +15,11 @@ Revisions:
 *********************************************************************************************/
 
 #include <stdio.h>
-#include <sys/types.h>
-#include <sys/socket.h>
 #include <getopt.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 #include "server.h"
-#include "acceptor.h"
 
 #define DEFAULT_PORT 8005
 
@@ -160,9 +157,10 @@ int main(int argc, char** argv)
             }
         }
 
-        if (start_acceptor(server, port) == -1)
+        if (serve(server, port) == -1)
         {
             exit(EXIT_FAILURE);
         }
     }
+    return EXIT_SUCCESS;
 }

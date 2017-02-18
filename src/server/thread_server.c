@@ -5,12 +5,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
-#include <netdb.h>
 
 #include "vector.h"
 #include "ring_buffer.h"
 #include "server.h"
-#include "client.h"
 
 static const unsigned int WORKER_POOL_SIZE = 200;
 
@@ -30,6 +28,10 @@ typedef struct
     vector_t worker_params_list;
     ring_buffer_t client_backlog;
 } thread_server_private;
+
+static int thread_server_start(server_t* start, acceptor_t* acceptor, int* handles_accept);
+static int thread_server_add_client(server_t* server, client_t client);
+static void thread_server_cleanup(server_t* server);
 
 static void* worker_func(void* void_params)
 {
@@ -55,68 +57,31 @@ static void* worker_func(void* void_params)
     return NULL;
 }
 
-static void* get_clients_thread_func(void* void_server)
+static void accept_loop(server_t* server, acceptor_t* acceptor)
 {
-    server_t* server = (server_t*)void_server;
-    thread_server_private* private = (thread_server_private*)server->private;
-    worker_params** list = (worker_params**)private->worker_params_list.items;
-
     // Get clients from the acceptor and send them to an available thread
-    while (!atomic_load_explicit(&done, memory_order_acquire))
+    while (!atomic_load(&done))
     {
         client_t next_client;
-        ring_buffer_get(&private->client_backlog, &next_client);
-
-        // Find the next non-busy thread, if any
-        unsigned i;
-        for(i = 0; i < private->worker_params_list.size; ++i)
+        int result = accept_client(acceptor, &next_client);
+        if (result == -1)
         {
-            worker_params* params = list[i];
-            int busy = atomic_load_explicit(&params->busy, memory_order_acquire);
-            if (!busy)
-            {
-                list[i]->client = next_client;
-                atomic_store(&params->busy, 1);
-                break;
-            }
+            // TODO: Error handling ;)
+            break;
         }
 
-        if (i == private->worker_params_list.size)
+        if (server->add_client(server, next_client) == -1)
         {
-            // All threads are busy; add a new one to the list and give it the new connection
-            worker_params* new_params = NULL;
-            new_params = malloc(sizeof(worker_params));
-            if (!new_params || (vector_push_back(&private->worker_params_list, &new_params) == -1))
-            {
-                free(new_params);
-                goto error_cleanup;
-            }
-
-            new_params->busy = 1;
-            new_params->client = next_client;
-
-            pthread_t new_thread;
-            if(pthread_create(&new_thread, NULL, worker_func, new_params) == -1 ||
-               pthread_detach(new_thread) == -1)
-            {
-                free(new_params);
-                goto error_cleanup;
-            }
+            // TODO: Error handling ;)
+            break;
         }
     }
-
-    vector_free(&private->worker_params_list); // The threads will free the individual elements
-    return NULL;
-
-error_cleanup:
-    // TODO: Log error
-    atomic_store(&done, 1);
-    vector_free(&private->worker_params_list);
-    return NULL;
 }
 
-int thread_server_init(server_t* thread_server)
+int thread_server_start(server_t *thread_server, acceptor_t *acceptor, int *handles_accept)
 {
+    *handles_accept = 1;
+
     thread_server_private* priv = malloc(sizeof(thread_server_private));
     if (!priv)
     {
@@ -177,13 +142,67 @@ int thread_server_init(server_t* thread_server)
 
         return -1;
     }
+
+    accept_loop(thread_server, acceptor);
+}
+
+static int thread_server_add_client(server_t* server, client_t client)
+{
+    thread_server_private* private = (thread_server_private*)server->private;
+    worker_params** list = (worker_params**)private->worker_params_list.items;
+
+    // Find the next non-busy thread, if any
+    unsigned i;
+    for(i = 0; i < private->worker_params_list.size; ++i)
+    {
+        worker_params* params = list[i];
+        int busy = atomic_load(&params->busy);
+        if (!busy)
+        {
+            list[i]->client = client;
+            atomic_store(&params->busy, 1);
+            break;
+        }
+    }
+
+    if (i == private->worker_params_list.size)
+    {
+        // All threads are busy; add a new one to the list and give it the new connection
+        worker_params* new_params = NULL;
+        new_params = malloc(sizeof(worker_params));
+        if (!new_params || (vector_push_back(&private->worker_params_list, &new_params) == -1))
+        {
+            free(new_params);
+            return -1;
+        }
+
+        new_params->busy = 1;
+        new_params->client = client;
+
+        pthread_t new_thread;
+        if(pthread_create(&new_thread, NULL, worker_func, new_params) == -1 ||
+           pthread_detach(new_thread) == -1)
+        {
+            free(new_params);
+        }
+    }
+
+    return 0;
+}
+
+static void thread_server_cleanup(server_t* thread_server)
+{
+    thread_server_private* private = (thread_server_private*)thread_server->private;
+    vector_free(&private->worker_params_list); // The threads will free the individual elements... I hope
+    atomic_store(&done, 1);
+    free(private);
 }
 
 static server_t thread_server_impl =
 {
-    thread_server_init,
-    NULL,
-    NULL,
+    thread_server_start,
+    thread_server_add_client,
+    thread_server_cleanup,
     NULL
 };
 
