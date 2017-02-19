@@ -36,7 +36,6 @@ Name:			main.c
 #define DEFAULT_NUMBER_CLIENTS 1000
 #define DEFAULT_MAXIMUM_REQUESTS 1
 #define NETWORK_BUFFER_SIZE 1024
-#define DEFAULT_THREADS 1000
 
 /*********************************************************************************************
 FUNCTION
@@ -69,12 +68,10 @@ void print_usage(char const* name)
     printf("\t-p, --port [port]:        the port on which to listen for connections;\n");
     printf("\t-m, --max [max]           the max numbers of requests.\n");
     printf("\t-n, --clients [clients]   the number of clients to create.\n");
-    printf("\t-t, --threads [threads]   the number of clients to create.\n");
     printf("\t                          default port is %s.\n", DEFAULT_PORT);
     printf("\t                          default IP is %s.\n", DEFAULT_IP);
     printf("\t                          default number of clients is %d.\n", DEFAULT_NUMBER_CLIENTS);
     printf("\t                          default number of max requests is %d.\n", DEFAULT_MAXIMUM_REQUESTS);
-    printf("\t                          default number of threads per client is %d.\n", DEFAULT_THREADS);
 }
 
 /*********************************************************************************************
@@ -114,7 +111,6 @@ int main(int argc, char** argv)
         {"port",    1, NULL, 'p'},
         {"max",     1, NULL, 'm'},
         {"clients", 1, NULL, 'n'},
-        {"threads", 1, NULL, 't'},
         {"help",    0, NULL, 'h'},
         {0, 0, 0, 0},
     };
@@ -123,7 +119,6 @@ int main(int argc, char** argv)
     client_datas.ip = DEFAULT_IP;
     client_datas.max_requests = DEFAULT_MAXIMUM_REQUESTS;
     client_datas.num_of_clients = DEFAULT_NUMBER_CLIENTS;
-    client_datas.num_of_threads = DEFAULT_THREADS;
 
     if (argc > 1)
     {
@@ -195,22 +190,6 @@ int main(int argc, char** argv)
                     }
                 }
                 break;
-                case 't':
-                {
-                    unsigned int num_of_threads_int;
-                    int num_of_threads_read = sscanf(optarg, "%d", &num_of_threads_int);
-                    if( num_of_threads_read != 1)
-                    {
-                        fprintf(stderr, "Invalid number of Max Requests %s.\n", optarg);
-                        print_usage(argv[0]);
-                        exit(EXIT_FAILURE);
-                    }
-                    else
-                    {
-                        client_datas.max_requests = (unsigned int)num_of_threads_int;
-                    }
-                }                    
-                break;
                 case 'h':
                     print_usage(argv[0]);
                     exit(EXIT_SUCCESS);
@@ -270,33 +249,18 @@ FUNCTION
 *********************************************************************************************/
 int start_client(client_info client_datas)
 {
-    // int sockets[2];
-    int threads = client_datas.num_of_threads;
+    int threads = client_datas.num_of_clients;
     int count = 0;
-    client_info data[threads];
+    client_info* data = malloc(sizeof(client_info) * client_datas.num_of_clients);
     pthread_t thread = 0;
     pthread_attr_t attribute;
 
-    // if (socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) == -1)
-    // {
-    //     fprintf(stderr, "Unable to create socket pair.\n");
-    //     return -1;
-    // }
-
-    pthread_attr_init(&attribute);
-    
-    if (pthread_attr_setdetachstate(&attribute, PTHREAD_CREATE_DETACHED) != 0)
+    if (data == NULL)
     {
-        fprintf(stderr, "Thread Attributes unable to be set to detached.\n");
+        perror("malloc");
         return -1;
     }
-
-    if (pthread_attr_setscope(&attribute, PTHREAD_SCOPE_SYSTEM) != 0)
-    {
-        fprintf(stderr,"System Scopen unable to be set to thread.\n");
-        return -1;
-    }
-    
+        
     for (count = 0; count < threads; count++)
     {
         memcpy(&data[count], &client_datas, sizeof(client_datas));
@@ -304,17 +268,14 @@ int start_client(client_info client_datas)
 
     for (count = 0; count < threads; count++)
     {
-        if (pthread_create(&thread, &attribute, clients, (void *) &data[count]) != 0)
+        if (pthread_create(&thread, NULL, clients, (void *) &data[count]) != 0)
         {
             fprintf(stderr, "Unable to create thread.\n");
             return -1;
         }
+        pthread_detach(thread);
     }
  
-    pthread_attr_destroy(&attribute);
-    
-    wait(&count);
-
     return 1;
 }
 
@@ -344,17 +305,14 @@ FUNCTION
 *********************************************************************************************/
 void* clients(void* infos)
 {
-    int* sockets = 0;
+    int sock = 0;
     char* buffer = 0;
-    ssize_t read = 0;
-    int count = 0;
     int data_received = 0;
     int request_time = 0;
-    int index = 0;
-    int result = 0;
     char const* msg_send = "Hello, Mat!";
     unsigned char msg_recv[NETWORK_BUFFER_SIZE];
     client_info *data = (client_info *)infos;
+    
     struct timeval start_time;
     struct timeval end_time;
 
@@ -363,73 +321,49 @@ void* clients(void* infos)
         fprintf(stderr, "Unable to allocate buffer memory.\n");
         return 0;
     }
-    if ((sockets = malloc(sizeof(int) * data->num_of_clients)) == NULL)
+
+    sock = connect_to_server(data->port, data->ip);
+    if (sock == -1)
     {
-        fprintf(stderr, "Unable to allocate socket memory.\n");
-        return 0;
+        return NULL;
+    }
+    else if (set_reuse(&sock) == -1)
+    {
+        shutdown(sock, 0);
+        close_socket(&sock);
+        return NULL;
     }
 
-    for (index = 0; index < data->num_of_clients; index++)
-    {      
-        /* Create a socket and connect to the server */
-        sockets[index] = connect_to_server(data->port, data->ip);
-
-        /* Set the socket to reuse for improper shutdowns */
-        if ((sockets[index] != -1) && (set_reuse(&sockets[index]) != -1))
-        {
-            break;
-        }
-    }
-
-    // TODO: Change this to allow concurrent requests
-    if (index != data->num_of_clients)
+    for (int i = 0; i < data->max_requests; i++)
     {
-        while (1)
+        gettimeofday(&start_time, NULL);
+
+        uint32_t msg_send_size = (uint32_t)strlen(msg_send);
+        if (send_data(sock, (char const*)&msg_send_size, sizeof(uint32_t)) == -1 ||
+            send_data(sock, msg_send, strlen(msg_send)) == -1)
         {
-            count++;
-            
-            for (index = 0; index < data->num_of_clients; index++)
-            {
-                gettimeofday(&start_time, NULL);
-
-                uint32_t msg_send_size = (uint32_t)strlen(msg_send);
-                if (send_data(sockets[index], (char const*)&msg_send_size, sizeof(uint32_t)) == -1 ||
-                    send_data(sockets[index], msg_send, strlen(msg_send)) == -1)
-                {
-                    continue;
-                }
-
-                if ((read = read_data(sockets[index], msg_recv, strlen(msg_send))) == -1)
-                {
-                    continue;
-                }
-
-                gettimeofday(&end_time, NULL);
-
-                data_received += read;
-                request_time += (end_time.tv_sec * 1000000 + end_time.tv_usec) -
-                               (start_time.tv_sec * 1000000 + start_time.tv_usec);
-                
-            }
-
-            if (count >= data->max_requests)
-            {
-                break;
-            }
+            continue;
         }
-		
+
+        ssize_t bytes_read;
+        if ((bytes_read = read_data(sock, msg_recv, strlen(msg_send))) == -1)
+        {
+            continue;
+        }
+
+        gettimeofday(&end_time, NULL);
+
+        data_received += bytes_read;
+        request_time += (end_time.tv_sec * 1000000 + end_time.tv_usec) -
+                        (start_time.tv_sec * 1000000 + start_time.tv_usec);
+        
     }
 
 	// printf("Total Request Time: %d and Total Data Received: %d\n", request_time,  data_received);
     // fflush(stdout);
 
-    for (index = 0; index < data->num_of_clients; index++)
-    {
-        close_socket(&sockets[index]);
-    }
-
-    free(buffer);
-    
+    close_socket(&sock);
+    free(buffer);    
     pthread_exit(NULL);
 }
 

@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include "vector.h"
 
 static const float VECTOR_GROWTH_RATE = 1.5;
@@ -58,7 +59,7 @@ int vector_insert_at(vector_t* vec, void* item, unsigned i)
 
     if (vec->size == vec->cap)
     {
-        size_t new_cap = (size_t)(vec->cap * VECTOR_GROWTH_RATE);
+        size_t new_cap = (size_t)roundf(vec->cap * VECTOR_GROWTH_RATE);
         if (vector_resize(vec, new_cap) == -1)
         {
             return -1;

@@ -59,11 +59,14 @@ static void* worker_func(void* void_params)
         thread_server_request request;
 
         if (read_data(params->client.sock, &request.msg_size, sizeof(request.msg_size)) == -1 ||
-            (request.msg = malloc(request.msg_size) == NULL))
+            (request.msg = malloc(request.msg_size)) == NULL)
         {
             atomic_store(&done, 1);
             break;
         }
+        //fprintf(stderr, "%u\n", request.msg_size);
+        //fflush(stderr);
+
         read_data(params->client.sock, request.msg, request.msg_size);
         send_data(params->client.sock, request.msg, request.msg_size);
     }
@@ -75,11 +78,11 @@ static void* worker_func(void* void_params)
 static void accept_loop(server_t* server, acceptor_t* acceptor)
 {
     // Get clients from the acceptor and send them to an available thread
-    while (!atomic_load(&done))
+    while (1)
     {
         client_t next_client;
         int result = accept_client(acceptor, &next_client);
-        if (result == -1)
+        if (result == -1 || atomic_load(&done))
         {
             break;
         }
