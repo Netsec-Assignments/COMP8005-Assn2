@@ -38,19 +38,6 @@ typedef struct
     select_server_request requests[FD_SETSIZE];
 } select_server_client_set;
 
-// Not too efficient. Oh well ¯\_(ツ)_/¯
-static void register_fds(select_server_client_set* client_set)
-{
-    FD_ZERO(&client_set->set);
-    for (int i = 0; i < FD_SETSIZE; ++i)
-    {
-        if (client_set->clients[i].sock != -1)
-        {
-            FD_SET(client_set->clients[i].sock, &client_set->set);
-        }
-    }
-}
-
 /**
  * Handles a client request on the given socket.
  *
@@ -184,6 +171,11 @@ static int select_server_start(server_t* server, acceptor_t* acceptor, int* hand
 
     server->private = client_set;
 
+    for (int i = 0; i < FD_SETSIZE; ++i)
+    {
+        client_set->clients[i].sock = -1;
+    }
+
     client_set->clients[acceptor->sock].sock = acceptor->sock;
     client_set->max_fd = acceptor->sock;
     memset(client_set->requests, 0, FD_SETSIZE * sizeof(select_server_request));
@@ -191,9 +183,9 @@ static int select_server_start(server_t* server, acceptor_t* acceptor, int* hand
     int num_selected;
     while(1)
     {
-        register_fds(client_set);
+        fd_set read_fds = client_set->set;
 
-        num_selected = select(client_set->max_fd, &client_set->set, NULL, NULL, NULL);
+        num_selected = select(client_set->max_fd + 1, &read_fds, NULL, NULL, NULL);
         if (num_selected == -1)
         {
             if (errno != EINTR)
@@ -204,7 +196,7 @@ static int select_server_start(server_t* server, acceptor_t* acceptor, int* hand
         }
 
         // Check for new clients
-        if(FD_ISSET(acceptor->sock, &client_set->set))
+        if(FD_ISSET(acceptor->sock, &read_fds))
         {
             client_t client;
             int result = accept_client(acceptor, &client);
@@ -227,7 +219,7 @@ static int select_server_start(server_t* server, acceptor_t* acceptor, int* hand
 
         for (int i = acceptor->sock + 1; i < FD_SETSIZE; ++i)
         {
-            if (client_set->clients[i].sock != -1 && FD_ISSET(client_set->clients[i].sock, &client_set->set))
+            if (client_set->clients[i].sock != -1 && FD_ISSET(client_set->clients[i].sock, &read_fds))
             {
                 if (handle_request(client_set, client_set->clients[i].sock) == -1)
                 {
@@ -254,6 +246,7 @@ static int select_server_add_client(server_t* server, client_t client)
     {
         client_set->max_fd = client.sock;
     }
+    FD_SET(client.sock, &client_set->set);
 
     return 0;
 }
