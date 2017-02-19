@@ -4,6 +4,7 @@
 #include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <pthread.h>
 
 #include "vector.h"
@@ -69,6 +70,11 @@ static void* worker_func(void* void_params)
 
         read_data(params->client.sock, request.msg, request.msg_size);
         send_data(params->client.sock, request.msg, request.msg_size);
+
+        shutdown(params->client.sock, 0);
+        close(params->client.sock);
+
+        atomic_store(&params->busy, 0);
     }
 
     free(params);
