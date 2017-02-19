@@ -36,12 +36,13 @@ Name:			main.c
 
 #define DEFAULT_PORT "8005"
 #define DEFAULT_IP "192.168.0.9"
-#define DEFAULT_NUMBER_CLIENTS 100
+#define DEFAULT_NUMBER_CLIENTS 10000
 #define DEFAULT_MAXIMUM_REQUESTS 1
 #define NETWORK_BUFFER_SIZE 1024
 #define STACK_SIZE 65536
 
 static atomic_int thread_count = 0;
+
 
 /*********************************************************************************************
 FUNCTION
@@ -380,6 +381,7 @@ void* clients(void* infos)
         atomic_fetch_sub(&thread_count, 1);
         shutdown(sock, 0);
         close_socket(&sock);
+        perror("set_reuse");
         return NULL;
     }
 
@@ -395,9 +397,10 @@ void* clients(void* infos)
         }
 
         ssize_t bytes_read;
-        if ((bytes_read = read_data(sock, msg_recv, strlen(msg_send))) == -1)
+        if ((bytes_read = read_data(sock, msg_recv, strlen(msg_send))))
         {
-            continue;
+            perror("read_data");
+            break;
         }
 
         gettimeofday(&end_time, NULL);
@@ -409,6 +412,12 @@ void* clients(void* infos)
     }
     
     uint32_t send_final_size = 0;
+    ssize_t read_final_size = 0;
+    
+    // if ((read_final_size = read_data(sock, &read_final_size, 1) == 0))
+    // {
+        // perror("read_final_size");
+    // }
 
     if (send_data(sock, (char const*)&send_final_size, sizeof(uint32_t)) == -1)
     {
