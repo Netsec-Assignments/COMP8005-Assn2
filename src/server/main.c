@@ -84,7 +84,7 @@ Revisions:
 int main(int argc, char** argv)
 {
     unsigned short port = DEFAULT_PORT;
-    server_t* server = thread_server;
+    server_t* server = select_server;
 
     char const* short_opts = "p:s:h";
     struct option long_opts[] =

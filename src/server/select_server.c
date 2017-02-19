@@ -5,9 +5,14 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <errno.h>
-#include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
+#include <fcntl.h>
+#include <sys/types.h>
+#undef __FD_SETSIZE
+#define __FD_SETSIZE 32768
+#include <sys/select.h>
+#include <unistd.h>
 
 #include "acceptor.h"
 #include "protocol.h"
@@ -60,109 +65,100 @@ static int handle_request(select_server_client_set* set, int sock)
     int index = sock; // To make things a bit less confusing
     select_server_request* request = set->requests + index;
 
-    // We haven't yet received anything from this client
-    if (request->msg == NULL)
+    int would_block = 0;
+    do
     {
-        unsigned char* raw = ((unsigned char*)&request->partial_msg_size) + request->transferred;
-        size_t bytes_left = sizeof(request->partial_msg_size) - request->transferred;
-        ssize_t bytes_read = read_data(sock, raw, sizeof(request->partial_msg_size) - request->transferred);
-        if (bytes_read == -1)
-        {
-            shutdown(sock, 0);
-            close(sock);
-            return -1;
-        }
+        int which_message = request->transferred / (request->msg_size + sizeof(request->msg_size));
+        size_t offset = request->transferred % (request->msg_size + sizeof(request->msg_size));
 
-        request->transferred += bytes_read;
-        if (bytes_read < bytes_left)
+        if (offset < sizeof(request->msg_size))
         {
-            return 0;
-        }
-        else
-        {
-            request->msg_size = request->partial_msg_size;
-            request->msg = malloc(request->msg_size);
-            if (!request->msg)
+            // We're reading a message size
+            unsigned char* raw = ((unsigned char*)&request->partial_msg_size) + offset;
+            size_t bytes_left = sizeof(request->partial_msg_size) - offset;
+            ssize_t bytes_read = read_data(sock, raw, bytes_left);
+            if (bytes_read == -1)
             {
-                perror("malloc");
-                shutdown(sock, 0);
-                close(sock);
-                return -1;
-            }
-        }
-    }
-
-    // Read the next piece of data (message size or message content) from the client
-    int which_message = request->transferred / (request->msg_size + sizeof(request->msg_size));
-    size_t offset = request->transferred % (request->msg_size + sizeof(request->msg_size));
-
-    // We're reading partial_msg_size
-    if (offset < sizeof(request->msg_size))
-    {
-        unsigned char* raw = ((unsigned char*)&request->partial_msg_size) + offset;
-        size_t bytes_left = sizeof(request->partial_msg_size) - offset;
-        ssize_t bytes_read = read_data(sock, raw, bytes_left);
-        if (bytes_read == -1)
-        {
-            shutdown(sock, 0);
-            close(sock);
-            return -1;
-        }
-
-        request->transferred += bytes_read;
-        if (bytes_read >= bytes_left)
-        {
-            if (request->partial_msg_size == 0)
-            {
-                // We've read all data from this client, so clean up
                 shutdown(sock, 0);
                 close(sock);
                 free(request->msg);
-                set->clients[index].sock = -1;
-                return 0;
+                return -1;
+            }
+
+            request->transferred += bytes_read;
+            if (bytes_read < bytes_left)
+            {
+                would_block = 1;
             }
             else
             {
-                offset += bytes_read;
+                request->msg_size = request->partial_msg_size;
+                if (request->msg_size == 0)
+                {
+                    // Client is done sending
+                    shutdown(sock, 0);
+                    close(sock);
+                    free(request->msg);
+
+                    // Reset everything for the next client
+                    // TODO: Stats tracking should go here
+                    memset(request, 0, sizeof(select_server_request));
+                    set->clients[index].sock = -1;
+                    break;
+                }
+                if (request->msg == NULL)
+                {
+                    request->msg = malloc(request->msg_size);
+                    if (!request->msg)
+                    {
+                        perror("malloc");
+                        shutdown(sock, 0);
+                        close(sock);
+                        return -1;
+                    }
+                }
             }
         }
         else
         {
-            return 0;
-        }
-    }
+            // We're reading message content
+            size_t bytes_left = request->msg_size - offset;
+            ssize_t bytes_read = read_data(sock, request->msg, bytes_left);
 
-    offset -= sizeof(request->msg_size);
-    size_t bytes_left = request->msg_size - offset;
-    ssize_t bytes_read = read_data(sock, request->msg + offset, bytes_left);
-    if (bytes_read == -1)
-    {
-        shutdown(sock, 0);
-        close(sock);
-        return -1;
-    }
+            if (bytes_read == -1)
+            {
+                shutdown(sock, 0);
+                close(sock);
+                free(request->msg);
+                return -1;
+            }
 
-    request->transferred += bytes_read;
-    if (bytes_read == bytes_left)
-    {
-        if (request->partial_msg_size == 0)
-        {
-            // We've read all data from this client, so clean up
-            shutdown(sock, 0);
-            close(sock);
-            free(request->msg);
-            set->clients[index].sock = -1;
-            return 0;
+            request->transferred += bytes_read;
+            if (bytes_read < bytes_left)
+            {
+                would_block = 1;
+            }
+            else
+            {
+                // We've received a full message; echo back to the client
+                ssize_t bytes_sent;
+                ssize_t send_bytes_left = (ssize_t)request->msg_size;
+                do
+                {
+                    bytes_sent = send_data(sock, request->msg + (request->msg_size - send_bytes_left), send_bytes_left);
+                    send_bytes_left -= bytes_sent;
+                } while(bytes_sent != -1 && send_bytes_left > 0);
+                
+                if (bytes_sent == -1)
+                {
+                    shutdown(sock, 0);
+                    close(sock);
+                    free(request->msg);
+                    return -1;
+                }
+            }
         }
-        else
-        {
-            offset += bytes_read;
-        }
-    }
-    else
-    {
-        return 0;
-    }
+    } while(!would_block);
 
     return 0;
 }
@@ -179,10 +175,9 @@ static int select_server_start(server_t* server, acceptor_t* acceptor, int* hand
     }
 
     // Set accept socket to non-blocking mode
-    int yes = 1;
-    if (setsockopt(acceptor->sock, SOL_SOCKET, SOCK_NONBLOCK, &yes, sizeof(yes)) == -1)
+    if (fcntl(acceptor->sock, F_SETFD, O_NONBLOCK) == -1)
     {
-        perror("setsockopt");
+        perror("fnctl");
         free(client_set);
         return -1;
     }
@@ -247,8 +242,7 @@ static int select_server_start(server_t* server, acceptor_t* acceptor, int* hand
 
 static int select_server_add_client(server_t* server, client_t client)
 {
-    int yes = 1;
-    if (setsockopt(client.sock, SOL_SOCKET, SOCK_NONBLOCK, &yes, sizeof(yes)) == -1)
+    if (fcntl(client.sock, F_SETFD, O_NONBLOCK) == -1)
     {
         perror("setsockopt");
         return -1;
