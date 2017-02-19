@@ -45,7 +45,7 @@ ssize_t read_data(int sock, void *buffer, size_t bytes_to_read)
 
     while (read_total < bytes_to_read)
     {
-        bytes_read = recv(sock, raw + read_total, bytes_left, MSG_WAITALL);
+        bytes_read = recv(sock, raw + read_total, bytes_left, 0);
         if (bytes_read == -1)
         {
             if (errno == EWOULDBLOCK)

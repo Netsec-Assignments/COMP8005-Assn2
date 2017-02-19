@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <client.h>
 
 #include "vector.h"
 #include "ring_buffer.h"
@@ -36,7 +37,7 @@ typedef struct
     ring_buffer_t client_backlog;
 } thread_server_private;
 
-static int thread_server_start(server_t* start, acceptor_t* acceptor, int* handles_accept);
+static int thread_server_start(server_t* server, acceptor_t* acceptor, int* handles_accept);
 static int thread_server_add_client(server_t* server, client_t client);
 static void thread_server_cleanup(server_t* server);
 
@@ -59,18 +60,41 @@ static void* worker_func(void* void_params)
         // Handle the new client
         thread_server_request request;
 
-        if (read_data(params->client.sock, &request.msg_size, sizeof(request.msg_size)) == -1 ||
-            (request.msg = malloc(request.msg_size)) == NULL)
+        ssize_t read_result = read_data(params->client.sock, &request.msg_size, sizeof(request.msg_size));
+        if (read_result == -1)
         {
             atomic_store(&done, 1);
             break;
         }
-        //fprintf(stderr, "%u\n", request.msg_size);
-        //fflush(stderr);
+        else if (read_result != 0) // We should actually always receive > 0 the first time, but who knows
+        {
+            request.msg = malloc(request.msg_size);
+            if (request.msg == NULL)
+            {
+                atomic_store(&done, 1);
+                shutdown(params->client.sock, 0);
+                close(params->client.sock);
+                break;
+            }
+        }
 
-        read_data(params->client.sock, request.msg, request.msg_size);
-        send_data(params->client.sock, request.msg, request.msg_size);
+        request.stats.transferred = sizeof(uint32_t);
 
+        // Continue reading from the client until we get size == 0
+        while(1)
+        {
+            // Read all data, send it, then read the next message size
+            // TODO: Handle errors here
+            read_data(params->client.sock, request.msg, request.msg_size);
+            send_data(params->client.sock, request.msg, request.msg_size);
+            read_data(params->client.sock, &request.msg_size, sizeof(request.msg_size));
+            if (request.msg_size == 0)
+            {
+                break;
+            }
+        }
+
+        free(request.msg);
         shutdown(params->client.sock, 0);
         close(params->client.sock);
 

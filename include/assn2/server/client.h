@@ -5,6 +5,8 @@
 #ifndef COMP8005_ASSN2_CLIENT_H
 #define COMP8005_ASSN2_CLIENT_H
 
+#include <netinet/in.h>
+
 typedef struct
 {
     struct sockaddr_in peer;
