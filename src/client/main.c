@@ -222,7 +222,7 @@ int main(int argc, char** argv)
     {
         //SEND TO OTHER PROCESS TO HANDLE DATA TO PRINT TO FILE
         //USE file_descriptors[1]
-        record_result(file_descriptors[1]);
+        record_result(file_descriptors[1], );
         return 0;
     }
 
@@ -561,5 +561,31 @@ FUNCTION
 *********************************************************************************************/
 void record_result(int socket)
 {
+    char *buffer;
+    int fd = 0;
+    int count = 0;
+
+    if((buffer = malloc(sizeof(char) * 4096)) == NULL)
+    {
+        fprintf(stderr, "Unable to allocate buffer.\n");
+        return 0;
+    }
+
+    if((fd = open("./result/result.txt", O_WRONLY | O_CREAT, 0755)) == -1)
+    {
+        fprintf(stderr, "Unable to open file.\n");
+        return 0;
+    }
+
+    while(1)
+    {
+        if(write(fd, buffer, count) == -1)
+        {
+            fprintf(stderr, "Unable to write to file.\n");
+            return 0;
+        }
+    }
     
+    close(fd);
+    close(socket);
 }
