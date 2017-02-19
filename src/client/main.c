@@ -36,7 +36,7 @@ Name:			main.c
 
 #define DEFAULT_PORT "8005"
 #define DEFAULT_IP "192.168.0.9"
-#define DEFAULT_NUMBER_CLIENTS 5000
+#define DEFAULT_NUMBER_CLIENTS 100
 #define DEFAULT_MAXIMUM_REQUESTS 1
 #define NETWORK_BUFFER_SIZE 1024
 #define STACK_SIZE 65536
@@ -227,8 +227,8 @@ int main(int argc, char** argv)
     {
         //SEND TO OTHER PROCESS TO HANDLE DATA TO PRINT TO FILE
         //USE file_descriptors[1]
-        
-        //record_result(file_descriptors[1], client_datas.num_of_clients);
+
+        record_result(file_descriptors[1], client_datas.num_of_clients);
         return 0;
     }
 
@@ -407,6 +407,14 @@ void* clients(void* infos)
                         (start_time.tv_sec * 1000000 + start_time.tv_usec);
         
     }
+    
+    uint32_t send_final_size = 0;
+
+    if (send_data(sock, (char const*)&send_final_size, sizeof(uint32_t)) == -1)
+    {
+        perror("send final size");
+        return 0;
+    }
 
 	sprintf(result_info, "Total number of clients: %d, Total Request Time: %d and Total Data Received: %d\n", data->num_of_clients ,request_time,  data_received);
     // fflush(stdout);
@@ -583,9 +591,9 @@ int record_result(int socket, int number_of_clients)
         return -1;
     }
 
-    if((fd = open("../result/result.txt", O_WRONLY | O_CREAT, 0755)) == -1)
+    if((fd = open("result.txt", O_WRONLY | O_CREAT, 0755)) == -1)
     {
-        fprintf(stderr, "Unable to open file.\n");
+        perror("open");
         return -1;
     }
 
