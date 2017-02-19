@@ -399,7 +399,7 @@ void* clients(void* infos)
         
     }
 
-	sprintf(result_info, "Total Request Time: %d and Total Data Received: %d\n", request_time,  data_received);
+	sprintf(result_info, "Total number of clients: %d, Total Request Time: %d and Total Data Received: %d\n", data->num_of_clients ,request_time,  data_received);
     // fflush(stdout);
 
     if(send_data(data->file_descriptor, result_info, strlen(result_info) == -1))
@@ -563,9 +563,10 @@ FUNCTION
 *********************************************************************************************/
 int record_result(int socket, int number_of_clients)
 {
-    char *buffer;
+    char* buffer;
     int fd = 0;
     int count = 0;
+    int number_of_clients_read = 0;
 
     if((buffer = malloc(sizeof(char) * 4096)) == NULL)
     {
@@ -581,13 +582,79 @@ int record_result(int socket, int number_of_clients)
 
     while(1)
     {
-        if(write(fd, buffer, count) == -1)
+        if(count == read_line(socket, buffer, 4096))
+        {
+            fprintf(stderr, "Unable to read the number of lines.\n");
+            return -1;
+        }
+
+        if(write(fd, buffer, ++count) == -1)
         {
             fprintf(stderr, "Unable to write to file.\n");
             return -1;
+        }
+        if(++number_of_clients_read >= number_of_clients)
+        {
+            break;
         }
     }
     
     close(fd);
     close(socket);
+}
+
+/*********************************************************************************************
+FUNCTION
+
+    Name:		read_line
+
+    Prototype:	int read_line(int socket, char* buffer, int size_of_bytes_to_read)
+
+    Developer:	Mat Siwoski
+
+    Created On: 2017-02-17
+
+    Parameters:
+    socket - Socket
+    buffer - Buffer of data
+    size_of_bytes_to_read - Size of bytes thats being read
+
+    Return Values:
+	
+    Description:
+    Read each individual line of data and get the count.
+
+    Revisions:
+	(none)
+
+*********************************************************************************************/
+int read_line(int socket, char* buffer, int size_of_bytes_to_read)
+{
+    int bytes_read = 0;
+    int count = 0;
+
+    for(count = 0; count < size_of_bytes_to_read; count++)
+    {
+        if((bytes_read = recv(socket, buffer, size_of_bytes_to_read, MSG_WAITALL)) == 1)
+        {
+            if(buffer[count] == '\n')
+            {
+                break;
+            }
+        }
+        else if(bytes_read == 0)
+        {
+            if(count == 0)
+            {
+                fprintf(stderr, "End of file reached.\n");
+                return -1;
+            }
+        }
+        else
+        {
+            fprintf(stderr, "Unable to write to file.\n");
+            return -1;
+        }
+    }
+    return count;
 }

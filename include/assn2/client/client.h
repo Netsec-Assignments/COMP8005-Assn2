@@ -20,5 +20,6 @@ void *clients(void *info);
 int close_socket(int* socket);
 int set_reuse(int* socket);
 int connect_to_server(const char *port, const char *ip);
+int read_line(int socket, char* buffer, int size_of_bytes_to_read);
 
 #endif
