@@ -73,7 +73,7 @@ int serve(server_t *server, unsigned short port)
         return -1;
     }
 
-    if (listen(acceptor.sock, 5) == -1)
+    if (listen(acceptor.sock, 100) == -1)
     {
         perror("listen");
         cleanup_acceptor(&acceptor);
