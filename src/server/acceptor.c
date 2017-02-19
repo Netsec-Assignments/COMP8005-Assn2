@@ -18,11 +18,12 @@ int accept_client(acceptor_t* acceptor, client_t* out)
     int peer_sock = accept(acceptor->sock, (struct sockaddr*)&peer, &accepted_len);
     if (peer_sock < 0)
     {
-        if (errno != EINTR)
+        if (errno != EINTR && errno != EWOULDBLOCK)
         {
             perror("accept");
         }
-        atomic_store(&done, 1);
+
+        atomic_store(&done, 1); // TODO: This probably shouldn't be a thing for EWOULDBLOCk.
         return -1;
     }
 
