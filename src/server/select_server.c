@@ -109,6 +109,7 @@ static int handle_request(select_server_client_set* set, int sock)
         else
         {
             // We're reading message content
+            offset -= sizeof(request->msg_size);
             size_t bytes_left = request->msg_size - offset;
             ssize_t bytes_read = read_data(sock, request->msg, bytes_left);
 
@@ -179,6 +180,9 @@ static int select_server_start(server_t* server, acceptor_t* acceptor, int* hand
     client_set->clients[acceptor->sock].sock = acceptor->sock;
     client_set->max_fd = acceptor->sock;
     memset(client_set->requests, 0, FD_SETSIZE * sizeof(select_server_request));
+
+    FD_ZERO(&client_set->set);
+    FD_SET(acceptor->sock, &client_set->set);
 
     int num_selected;
     while(1)

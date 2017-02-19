@@ -118,6 +118,11 @@ ssize_t read_data(int sock, void *buffer, size_t bytes_to_read)
             }
             return -1;
         }
+        else if (bytes_read == 0)
+        {
+            // Should really propagate this back up to the client
+            break;
+        }
         read_total += bytes_read;
         bytes_left = bytes_to_read - read_total;
     }
