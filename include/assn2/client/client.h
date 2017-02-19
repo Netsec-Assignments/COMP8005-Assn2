@@ -15,7 +15,7 @@ typedef struct
 
 int start_client(client_info client_datas);
 void print_usage(char const* name);
-void record_result(int socket);
+int record_result(int socket, int number_of_clients);
 void *clients(void *info);
 int close_socket(int* socket);
 int set_reuse(int* socket);

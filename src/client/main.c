@@ -18,6 +18,7 @@ Name:			main.c
 *********************************************************************************************/
 
 #include <arpa/inet.h>
+#include <fcntl.h>
 #include <getopt.h>
 #include <pthread.h>
 #include <netdb.h>
@@ -25,6 +26,7 @@ Name:			main.c
 #include <stdlib.h>
 #include <stdatomic.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -222,7 +224,7 @@ int main(int argc, char** argv)
     {
         //SEND TO OTHER PROCESS TO HANDLE DATA TO PRINT TO FILE
         //USE file_descriptors[1]
-        record_result(file_descriptors[1], );
+        record_result(file_descriptors[1], client_datas.num_of_clients);
         return 0;
     }
 
@@ -559,7 +561,7 @@ FUNCTION
 	(none)
 
 *********************************************************************************************/
-void record_result(int socket)
+int record_result(int socket, int number_of_clients)
 {
     char *buffer;
     int fd = 0;
@@ -568,13 +570,13 @@ void record_result(int socket)
     if((buffer = malloc(sizeof(char) * 4096)) == NULL)
     {
         fprintf(stderr, "Unable to allocate buffer.\n");
-        return 0;
+        return -1;
     }
 
     if((fd = open("./result/result.txt", O_WRONLY | O_CREAT, 0755)) == -1)
     {
         fprintf(stderr, "Unable to open file.\n");
-        return 0;
+        return -1;
     }
 
     while(1)
@@ -582,7 +584,7 @@ void record_result(int socket)
         if(write(fd, buffer, count) == -1)
         {
             fprintf(stderr, "Unable to write to file.\n");
-            return 0;
+            return -1;
         }
     }
     
