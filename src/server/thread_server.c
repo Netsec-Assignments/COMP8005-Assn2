@@ -10,6 +10,8 @@
 
 #include "vector.h"
 #include "ring_buffer.h"
+
+#include "done.h"
 #include "server.h"
 #include "protocol.h"
 

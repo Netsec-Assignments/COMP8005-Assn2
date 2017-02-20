@@ -13,7 +13,12 @@
 #define __FD_SETSIZE 32768
 #include <sys/select.h>
 #include <unistd.h>
+#include <sys/time.h>
+#include <arpa/inet.h>
 
+#include "log.h"
+#include "timing.h"
+#include "done.h"
 #include "acceptor.h"
 #include "protocol.h"
 #include "server.h"
@@ -25,6 +30,7 @@ static void select_server_cleanup(server_t* server);
 typedef struct
 {
     ssize_t transferred;
+    time_t transfer_time;
     uint32_t partial_msg_size; // :(
     uint32_t msg_size;
     char* msg;
@@ -52,6 +58,10 @@ static int handle_request(select_server_client_set* set, int sock)
     int index = sock; // To make things a bit less confusing
     select_server_request* request = set->requests + index;
 
+    struct timeval start;
+    gettimeofday(&start, NULL);
+
+    int result = 0;
     int would_block = 0;
     do
     {
@@ -66,11 +76,8 @@ static int handle_request(select_server_client_set* set, int sock)
             ssize_t bytes_read = read_data(sock, raw, bytes_left);
             if (bytes_read == -1)
             {
-                shutdown(sock, 0);
-                close(sock);
-                free(request->msg);
-                request->msg = NULL;
-                return -1;
+                result = -1;
+                goto cleanup;
             }
 
             request->transferred += bytes_read;
@@ -83,20 +90,8 @@ static int handle_request(select_server_client_set* set, int sock)
                 request->msg_size = request->partial_msg_size;
                 if (request->msg_size == 0)
                 {
-                    // Client is done sending
-                    shutdown(sock, 0);
-                    close(sock);
-                    free(request->msg);
-
-                    // Reset everything for the next client
-                    // TODO: Stats tracking should go here
-                    FD_CLR(sock, &set->set);
-                    request->msg = NULL;
-                    request->msg_size = 0;
-                    request->partial_msg_size = 0;
-                    request->transferred = 0;
-                    set->clients[index].sock = -1;
-                    break;
+                    // Client is finished sending data
+                    goto cleanup;
                 }
                 if (request->msg == NULL)
                 {
@@ -104,9 +99,8 @@ static int handle_request(select_server_client_set* set, int sock)
                     if (!request->msg)
                     {
                         perror("malloc");
-                        shutdown(sock, 0);
-                        close(sock);
-                        return -1;
+                        result = -1;
+                        goto cleanup;
                     }
                 }
             }
@@ -120,11 +114,8 @@ static int handle_request(select_server_client_set* set, int sock)
 
             if (bytes_read == -1)
             {
-                shutdown(sock, 0);
-                close(sock);
-                free(request->msg);
-                request->msg = NULL;
-                return -1;
+                result = -1;
+                goto cleanup;
             }
 
             request->transferred += bytes_read;
@@ -136,7 +127,7 @@ static int handle_request(select_server_client_set* set, int sock)
             {
                 // We've received a full message; echo back to the client
                 ssize_t bytes_sent;
-                ssize_t send_bytes_left = (ssize_t)request->msg_size;
+                size_t send_bytes_left = (ssize_t)request->msg_size;
                 do
                 {
                     bytes_sent = send_data(sock, request->msg + (request->msg_size - send_bytes_left), send_bytes_left);
@@ -145,17 +136,53 @@ static int handle_request(select_server_client_set* set, int sock)
                 
                 if (bytes_sent == -1)
                 {
-                    shutdown(sock, 0);
-                    close(sock);
-                    free(request->msg);
-                    request->msg = NULL;
-                    return -1;
+                    result = -1;
+                    goto cleanup;
                 }
             }
         }
-    } while(!would_block);
+    } while(!would_block && !atomic_load(&done));
+
+    {
+        struct timeval end;
+        gettimeofday(&end, NULL);
+        request->transfer_time += TIME_DIFF(start, end);
+    }
 
     return 0;
+
+cleanup:
+    if (result == 0)
+    {
+        // Success, so write results to file
+        struct timeval end;
+        gettimeofday(&end, NULL);
+        request->transfer_time += TIME_DIFF(start, end);
+
+        char csv[256];
+        char *addr = inet_ntoa(set->clients[index].peer.sin_addr);
+        snprintf(csv, 256, "%ld,%ld,%s\n", request->transfer_time, request->transferred, addr);
+        log_msg(csv);
+
+        char pretty[256];
+        snprintf(pretty, 256, "Transfer time; %ldms; total bytes transferred: %ld; peer: %s\n",
+                 request->transfer_time, request->transferred, addr);
+        printf("%s\n", pretty);
+    }
+
+    shutdown(sock, 0);
+    close(sock);
+    free(request->msg);
+
+    // Reset everything for the next client
+    FD_CLR(sock, &set->set);
+    request->msg = NULL;
+    request->msg_size = 0;
+    request->partial_msg_size = 0;
+    request->transferred = 0;
+    request->transfer_time = 0;
+    set->clients[index].sock = -1;
+    return result;
 }
 
 static int select_server_start(server_t* server, acceptor_t* acceptor, int* handles_accept)
@@ -233,6 +260,11 @@ static int select_server_start(server_t* server, acceptor_t* acceptor, int* hand
 
         for (int i = acceptor->sock + 1; i < FD_SETSIZE; ++i)
         {
+            if (atomic_load(&done))
+            {
+                break;
+            }
+
             if (client_set->clients[i].sock != -1 && FD_ISSET(client_set->clients[i].sock, &read_fds))
             {
                 if (handle_request(client_set, client_set->clients[i].sock) == -1)
@@ -243,7 +275,7 @@ static int select_server_start(server_t* server, acceptor_t* acceptor, int* hand
         }
     }
 
-    return (errno != EINTR) * -1;
+    return (errno && errno != EINTR) * -1;
 }
 
 static int select_server_add_client(server_t* server, client_t client)

@@ -10,8 +10,6 @@
 #include "client.h"
 #include "acceptor.h"
 
-extern atomic_int done;
-
 typedef struct server_t server_t;
 
 extern server_t* thread_server;

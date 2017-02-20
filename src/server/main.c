@@ -19,6 +19,8 @@ Revisions:
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+
+#include "log.h"
 #include "server.h"
 
 #define DEFAULT_PORT 8005
@@ -95,7 +97,7 @@ int main(int argc, char** argv)
         {0, 0, 0, 0},
     };
 
-    if (argc)
+    if (argc > 1)
     {
         int c;
         while ((c = getopt_long(argc, argv, short_opts, long_opts, NULL)) != -1)
@@ -156,11 +158,24 @@ int main(int argc, char** argv)
                 break;
             }
         }
-
-        if (serve(server, port) == -1)
-        {
-            exit(EXIT_FAILURE);
-        }
     }
-    return EXIT_SUCCESS;
+
+    if (log_open("transfers.txt") == -1)
+    {
+        exit(EXIT_FAILURE);
+    }
+
+    int ret = EXIT_SUCCESS;
+    if (serve(server, port) == -1)
+    {
+        ret = EXIT_FAILURE;
+    }
+
+    int result = log_close();
+    if (result < 0)
+    {
+        perror("close");
+    }
+
+    return ret;
 }

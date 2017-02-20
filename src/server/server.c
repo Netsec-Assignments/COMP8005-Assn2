@@ -8,6 +8,8 @@
 #include <signal.h>
 #include <netdb.h>
 #include <acceptor.h>
+
+#include "done.h"
 #include "acceptor.h"
 #include "server.h"
 
@@ -83,6 +85,7 @@ int serve(server_t *server, unsigned short port)
     int handles_accept;
     if (server->start(server, &acceptor, &handles_accept) == -1)
     {
+        perror("server->start");
         return -1;
     }
 

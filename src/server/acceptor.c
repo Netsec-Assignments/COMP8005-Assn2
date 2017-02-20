@@ -8,7 +8,8 @@
 #include <netdb.h>
 #include <unistd.h>
 #include <errno.h>
-#include <stdatomic.h>
+
+#include "done.h"
 #include "server.h"
 
 int accept_client(acceptor_t* acceptor, client_t* out)
