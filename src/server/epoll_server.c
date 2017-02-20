@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/epoll.h>
+#include <unistd.h> 
 #include "server.h"
 
 static server_t epoll_server_impl =
@@ -43,8 +44,10 @@ static int epoll_server_start(server_t* server, acceptor_t* acceptor, int* handl
     *handles_accept = 1;
     int epoll_max_events = 10000;
     int epoll = 0;
+    int epoll_ready = 0;
     struct epoll_event event;
     struct epoll_event events[epoll_max_events];
+    int index = 0;
     
     epoll_server_client_set* client_set = malloc(sizeof(epoll_server_client_set));
     if (client_set == NULL)
@@ -93,14 +96,14 @@ static int epoll_server_start(server_t* server, acceptor_t* acceptor, int* handl
 
     while (1)
     {
-        ready = epoll_wait(epoll, events, epoll_max_events, -1);
-        if (ready == -1)
+        epoll_ready = epoll_wait(epoll, events, epoll_max_events, -1);
+        if (epoll_ready == -1)
         {
             perror("epoll_wait");
             break;
         }
         
-        for (index = 0; index < ready; index++)
+        for (index = 0; index < epoll_ready; index++)
         {
             if (events[index].data.fd == acceptor->sock)
             {
