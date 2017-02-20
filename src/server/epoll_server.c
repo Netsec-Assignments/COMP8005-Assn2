@@ -10,7 +10,11 @@
 #include <string.h>
 #include <sys/epoll.h>
 #include <unistd.h> 
+
+#include "acceptor.h"
+#include "done.h"
 #include "server.h"
+#include "protocol.h"
 
 static server_t epoll_server_impl =
 {
@@ -107,7 +111,45 @@ static int epoll_server_start(server_t* server, acceptor_t* acceptor, int* handl
         {
             if (events[index].data.fd == acceptor->sock)
             {
+                while(!atomic_load(&done))
+                {
+                    fd_set read_fds = client_set->set;
+
+                    num_selected = select(client_set->max_fd + 1, &read_fds, NULL, NULL, NULL);
+                    if (num_selected == -1)
+                    {
+                        // if (errno != EBADF)
+                        // {
+                            if (errno != EINTR)
+                            {
+                                perror("select");
                             }
+                            break;
+                        // }
+                    }
+
+
+                    if(FD_ISSET(acceptor->sock, &read_fds))
+                    {
+                        client_t client;
+                        int result = accept_client(acceptor, &client);
+                        if (result == -1)
+                        {
+                            if (errno != EWOULDBLOCK)
+                            {
+                                break;
+                            }
+                        }
+                        else
+                        {
+                            if (server->add_client(server, client) == -1)
+                            {
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
             else
             {
                 //do something about the data
