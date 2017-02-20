@@ -69,6 +69,7 @@ static int handle_request(select_server_client_set* set, int sock)
                 shutdown(sock, 0);
                 close(sock);
                 free(request->msg);
+                request->msg = NULL;
                 return -1;
             }
 
@@ -89,7 +90,11 @@ static int handle_request(select_server_client_set* set, int sock)
 
                     // Reset everything for the next client
                     // TODO: Stats tracking should go here
-                    memset(request, 0, sizeof(select_server_request));
+                    FD_CLR(sock, &set->set);
+                    request->msg = NULL;
+                    request->msg_size = 0;
+                    request->partial_msg_size = 0;
+                    request->transferred = 0;
                     set->clients[index].sock = -1;
                     break;
                 }
@@ -118,6 +123,7 @@ static int handle_request(select_server_client_set* set, int sock)
                 shutdown(sock, 0);
                 close(sock);
                 free(request->msg);
+                request->msg = NULL;
                 return -1;
             }
 
@@ -142,6 +148,7 @@ static int handle_request(select_server_client_set* set, int sock)
                     shutdown(sock, 0);
                     close(sock);
                     free(request->msg);
+                    request->msg = NULL;
                     return -1;
                 }
             }
@@ -185,18 +192,21 @@ static int select_server_start(server_t* server, acceptor_t* acceptor, int* hand
     FD_SET(acceptor->sock, &client_set->set);
 
     int num_selected;
-    while(1)
+    while(!atomic_load(&done))
     {
         fd_set read_fds = client_set->set;
 
         num_selected = select(client_set->max_fd + 1, &read_fds, NULL, NULL, NULL);
         if (num_selected == -1)
         {
-            if (errno != EINTR)
-            {
-                perror("select");
-            }
-            break;
+            // if (errno != EBADF)
+            // {
+                if (errno != EINTR)
+                {
+                    perror("select");
+                }
+                break;
+            // }
         }
 
         // Check for new clients
@@ -227,13 +237,13 @@ static int select_server_start(server_t* server, acceptor_t* acceptor, int* hand
             {
                 if (handle_request(client_set, client_set->clients[i].sock) == -1)
                 {
-                    break;
+                    return -1;
                 }
             }
         }
     }
 
-    return errno == EINTR;
+    return (errno != EINTR) * -1;
 }
 
 static int select_server_add_client(server_t* server, client_t client)
