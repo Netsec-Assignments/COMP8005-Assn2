@@ -30,6 +30,8 @@ Name:			main.c
 #include <sys/time.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <aio.h>
+#include <errno.h>
 
 #include "client.h"
 #include "protocol.h"
@@ -218,22 +220,33 @@ int main(int argc, char** argv)
         }
     }
 	
-    if(socketpair(AF_UNIX, SOCK_STREAM, 0, file_descriptors) == -1)
+    // if(socketpair(AF_UNIX, SOCK_STREAM, 0, file_descriptors) == -1)
+    // {
+    //     fprintf(stderr, "Unable to create socket pair.\n");
+    //     exit(EXIT_FAILURE);
+    // }
+
+    // pid_t result = fork();
+    // if (result == -1)
+    // {
+    //     perror("fork");
+    //     exit(EXIT_FAILURE);
+    // }
+
+    // if(result == 0)
+    // {
+    //     //SEND TO OTHER PROCESS TO HANDLE DATA TO PRINT TO FILE
+    //     //USE file_descriptors[1]
+
+    //     record_result(file_descriptors[1], client_datas.num_of_clients);
+    //     return 0;
+    // }
+
+    if((client_datas.file_descriptor = open("result.txt", O_WRONLY | O_CREAT | O_TRUNC | O_APPEND, 0777)) == -1)
     {
-        fprintf(stderr, "Unable to create socket pair.\n");
-        exit(EXIT_FAILURE);
+        perror("open");
+        return -1;
     }
-
-    if(!fork())
-    {
-        //SEND TO OTHER PROCESS TO HANDLE DATA TO PRINT TO FILE
-        //USE file_descriptors[1]
-
-        record_result(file_descriptors[1], client_datas.num_of_clients);
-        return 0;
-    }
-
-    client_datas.file_descriptor = file_descriptors[0];
 
     if (start_client(client_datas) == -1)
     {
@@ -322,7 +335,7 @@ int start_client(client_info client_datas)
         }
     }
     printf("All threads finished. Exiting\n");
-
+    close(client_datas.file_descriptor);
     return 1;
 }
 
@@ -358,7 +371,7 @@ void* clients(void* infos)
     int request_time = 0;
     char const* msg_send = "012345678901234567890123456789012345678901234567890123456798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568901234567890123456789012345678901234567890123456789";
     unsigned char msg_recv[4096];
-    unsigned char result_info[4096]; //not sure about this 
+    char result_info[512];
     client_info *data = (client_info *)infos;
     
     struct timeval start_time;
@@ -396,8 +409,8 @@ void* clients(void* infos)
             continue;
         }
 
-        ssize_t bytes_read;
-        if ((bytes_read = read_data(sock, msg_recv, strlen(msg_send))))
+        ssize_t bytes_read = read_data(sock, msg_recv, strlen(msg_send));
+        if (bytes_read < 0)
         {
             perror("read_data");
             break;
@@ -419,23 +432,32 @@ void* clients(void* infos)
         // perror("read_final_size");
     // }
 
-    if (send_data(sock, (char const*)&send_final_size, sizeof(uint32_t)) == -1)
+    if (errno == 0)
     {
-        perror("send final size");
-        return 0;
+        if (send_data(sock, (char const*)&send_final_size, sizeof(uint32_t)) == -1)
+        {
+            perror("send final size");
+            return 0;
+        }
+
+        sprintf(result_info, "Total number of clients: %d, Total Request Time: %d and Total Data Received: %d\n", data->num_of_clients ,request_time,  data_received);
+        size_t result_len = strlen(result_info);
+        struct aiocb cb;
+        memset(&cb, 0, sizeof(cb));
+
+        cb.aio_buf = &result_info[0];
+        cb.aio_nbytes = result_len;
+        cb.aio_fildes = data->file_descriptor;
+        if (aio_write(&cb) == -1)
+        {
+            perror("aio_write");
+            close(data->file_descriptor);
+        }
+
+        while(aio_error(&cb) == EINPROGRESS);
     }
-
-	sprintf(result_info, "Total number of clients: %d, Total Request Time: %d and Total Data Received: %d\n", data->num_of_clients ,request_time,  data_received);
-    // fflush(stdout);
-
-    if(send_data(data->file_descriptor, result_info, strlen(result_info) == -1))
-    {
-        fprintf(stderr, "Unable to send results to socket.\n"); 
-        return 0;
-    }
-
-    close_socket(&sock);
-    // free(buffer);   
+    
+    close_socket(&sock);   
     atomic_fetch_sub(&thread_count, 1); 
     pthread_exit(NULL);
 }
@@ -600,33 +622,41 @@ int record_result(int socket, int number_of_clients)
         return -1;
     }
 
-    if((fd = open("result.txt", O_WRONLY | O_CREAT, 0755)) == -1)
+    if((fd = open("result.txt", O_WRONLY | O_CREAT, 0666)) == -1)
     {
         perror("open");
         return -1;
     }
 
+    int failed = 0;
     while(1)
     {
-        if(count == read_line(socket, buffer, 4096))
+        int bytes_read = recv(socket, buffer, 4096, MSG_WAITALL);
+        if (bytes_read == 0)
         {
-            fprintf(stderr, "Unable to read the number of lines.\n");
-            return -1;
+            // Peer closed connections
+            break;
         }
+        else if (bytes_read < 0)
+        {
+            perror("recv");
+            failed = 1;
+            break;
+        }
+       
 
-        if(write(fd, buffer, ++count) == -1)
+        if(write(fd, buffer, bytes_read) == -1)
         {
-            fprintf(stderr, "Unable to write to file.\n");
-            return -1;
-        }
-        if(++number_of_clients_read >= number_of_clients)
-        {
+            perror("write");
+            failed = 1;
             break;
         }
     }
     
     close(fd);
     close(socket);
+    free(buffer);
+    return failed ? -1 : 0;
 }
 
 /*********************************************************************************************
@@ -659,28 +689,22 @@ int read_line(int socket, char* buffer, int size_of_bytes_to_read)
     int bytes_read = 0;
     int count = 0;
 
-    for(count = 0; count < size_of_bytes_to_read; count++)
+
+    if((bytes_read = recv(socket, buffer, size_of_bytes_to_read, MSG_WAITALL)) > 0)
     {
-        if((bytes_read = recv(socket, buffer, size_of_bytes_to_read, MSG_WAITALL)) == 1)
+        return bytes_read;
+    }
+    else if(bytes_read == 0)
+    {
+        if(count == 0)
         {
-            if(buffer[count] == '\n')
-            {
-                break;
-            }
-        }
-        else if(bytes_read == 0)
-        {
-            if(count == 0)
-            {
-                fprintf(stderr, "End of file reached.\n");
-                return -1;
-            }
-        }
-        else
-        {
-            fprintf(stderr, "Unable to write to file.\n");
+            fprintf(stderr, "End of file reached.\n");
             return -1;
         }
     }
-    return count;
+    else
+    {
+        fprintf(stderr, "Unable to write to file.\n");
+        return -1;
+    }
 }
