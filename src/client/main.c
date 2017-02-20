@@ -220,29 +220,7 @@ int main(int argc, char** argv)
         }
     }
 	
-    // if(socketpair(AF_UNIX, SOCK_STREAM, 0, file_descriptors) == -1)
-    // {
-    //     fprintf(stderr, "Unable to create socket pair.\n");
-    //     exit(EXIT_FAILURE);
-    // }
-
-    // pid_t result = fork();
-    // if (result == -1)
-    // {
-    //     perror("fork");
-    //     exit(EXIT_FAILURE);
-    // }
-
-    // if(result == 0)
-    // {
-    //     //SEND TO OTHER PROCESS TO HANDLE DATA TO PRINT TO FILE
-    //     //USE file_descriptors[1]
-
-    //     record_result(file_descriptors[1], client_datas.num_of_clients);
-    //     return 0;
-    // }
-
-    if((client_datas.file_descriptor = open("result.txt", O_WRONLY | O_CREAT | O_TRUNC | O_APPEND, 0777)) == -1)
+    if((client_datas.file_descriptor = open("result.csv", O_WRONLY | O_CREAT | O_TRUNC | O_APPEND, 0777)) == -1)
     {
         perror("open");
         return -1;
@@ -294,7 +272,6 @@ int start_client(client_info client_datas)
     client_info* data = malloc(sizeof(client_info) * client_datas.num_of_clients);
     pthread_t thread = 0;
     pthread_attr_t attribute;
-
 
     atomic_store_explicit(&thread_count, client_datas.num_of_clients, memory_order_relaxed);
 
@@ -369,19 +346,13 @@ void* clients(void* infos)
     char* buffer = 0;
     int data_received = 0;
     int request_time = 0;
-    char const* msg_send = "012345678901234567890123456789012345678901234567890123456798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568798012345687980123456879801234568901234567890123456789012345678901234567890123456789";
+    char* msg_send = make_random_string(4096);
     unsigned char msg_recv[4096];
     char result_info[512];
     client_info *data = (client_info *)infos;
-    
+    int client_count = 0;
     struct timeval start_time;
     struct timeval end_time;
-
-    // if ((buffer = malloc(sizeof(char) * NETWORK_BUFFER_SIZE)) == NULL)
-    // {
-    //     fprintf(stderr, "Unable to allocate buffer memory.\n");
-    //     return 0;
-    // }
 
     sock = connect_to_server(data->port, data->ip);
     if (sock == -1)
@@ -421,16 +392,11 @@ void* clients(void* infos)
         data_received += bytes_read;
         request_time += (end_time.tv_sec * 1000000 + end_time.tv_usec) -
                         (start_time.tv_sec * 1000000 + start_time.tv_usec);
-        
+        client_count++;
     }
     
     uint32_t send_final_size = 0;
     ssize_t read_final_size = 0;
-    
-    // if ((read_final_size = read_data(sock, &read_final_size, 1) == 0))
-    // {
-        // perror("read_final_size");
-    // }
 
     if (errno == 0)
     {
@@ -440,7 +406,8 @@ void* clients(void* infos)
             return 0;
         }
 
-        sprintf(result_info, "Total number of clients: %d, Total Request Time: %d and Total Data Received: %d\n", data->num_of_clients ,request_time,  data_received);
+        //Client Count, Request Time and Data Received
+        sprintf(result_info, "%d, %d, %d\n", client_count, request_time,  data_received);
         size_t result_len = strlen(result_info);
         struct aiocb cb;
         memset(&cb, 0, sizeof(cb));
@@ -586,125 +553,52 @@ int close_socket(int* socket)
     return close(*socket);
 }
 
+
 /*********************************************************************************************
 FUNCTION
 
-    Name:		record_result
+    Name:		make_random_string
 
-    Prototype:	void record_result(int socket)
+    Prototype:	char* make_random_string(size_t length)
 
     Developer:	Mat Siwoski
 
     Created On: 2017-02-17
 
     Parameters:
-    socket - Socket
+    length - Length of the random string to generate
 
     Return Values:
 	
     Description:
-    Records the results from the socket pair.
+    Creates a random string of set length.
 
     Revisions:
 	(none)
 
 *********************************************************************************************/
-int record_result(int socket, int number_of_clients)
+char* make_random_string(size_t length) 
 {
-    char* buffer;
-    int fd = 0;
-    int count = 0;
-    int number_of_clients_read = 0;
+    static char charset[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"; 
+    char *random_string;
 
-    if((buffer = malloc(sizeof(char) * 4096)) == NULL)
+    if (length) 
     {
-        fprintf(stderr, "Unable to allocate buffer.\n");
-        return -1;
-    }
+        random_string = malloc(length +1); 
 
-    if((fd = open("result.txt", O_WRONLY | O_CREAT, 0666)) == -1)
-    {
-        perror("open");
-        return -1;
-    }
+        if (random_string) 
+        {
+            int l = (int) (sizeof(charset)-1); 
+            int key; 
+            for (int n = 0;n < length;n++) 
+            {        
+                key = rand() % l;  
+                random_string[n] = charset[key];
+            }
 
-    int failed = 0;
-    while(1)
-    {
-        int bytes_read = recv(socket, buffer, 4096, MSG_WAITALL);
-        if (bytes_read == 0)
-        {
-            // Peer closed connections
-            break;
-        }
-        else if (bytes_read < 0)
-        {
-            perror("recv");
-            failed = 1;
-            break;
-        }
-       
-
-        if(write(fd, buffer, bytes_read) == -1)
-        {
-            perror("write");
-            failed = 1;
-            break;
+            random_string[length] = '\0';
         }
     }
-    
-    close(fd);
-    close(socket);
-    free(buffer);
-    return failed ? -1 : 0;
-}
 
-/*********************************************************************************************
-FUNCTION
-
-    Name:		read_line
-
-    Prototype:	int read_line(int socket, char* buffer, int size_of_bytes_to_read)
-
-    Developer:	Mat Siwoski
-
-    Created On: 2017-02-17
-
-    Parameters:
-    socket - Socket
-    buffer - Buffer of data
-    size_of_bytes_to_read - Size of bytes thats being read
-
-    Return Values:
-	
-    Description:
-    Read each individual line of data and get the count.
-
-    Revisions:
-	(none)
-
-*********************************************************************************************/
-int read_line(int socket, char* buffer, int size_of_bytes_to_read)
-{
-    int bytes_read = 0;
-    int count = 0;
-
-
-    if((bytes_read = recv(socket, buffer, size_of_bytes_to_read, MSG_WAITALL)) > 0)
-    {
-        return bytes_read;
-    }
-    else if(bytes_read == 0)
-    {
-        if(count == 0)
-        {
-            fprintf(stderr, "End of file reached.\n");
-            return -1;
-        }
-    }
-    else
-    {
-        fprintf(stderr, "Unable to write to file.\n");
-        return -1;
-    }
+    return random_string;
 }

@@ -15,11 +15,10 @@ typedef struct
 
 int start_client(client_info client_datas);
 void print_usage(char const* name);
-int record_result(int socket, int number_of_clients);
 void *clients(void *info);
 int close_socket(int* socket);
 int set_reuse(int* socket);
 int connect_to_server(const char *port, const char *ip);
-int read_line(int socket, char* buffer, int size_of_bytes_to_read);
+char* make_random_string(size_t length);
 
 #endif
