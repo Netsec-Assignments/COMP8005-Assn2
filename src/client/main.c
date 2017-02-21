@@ -385,12 +385,6 @@ void* clients(void* infos)
             perror("connect");
             return NULL;
         }
-        else if (set_reuse(&sock) == -1)
-        {
-            close_socket(&sock);
-            perror("set_reuse");
-            return NULL;
-        }
 
         for (int i = 0; i < data->max_requests; i++)
         {
@@ -510,8 +504,16 @@ int connect_to_server(const char *port, const char *ip)
         sock = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
         
         if (sock == -1)
+        {
             continue;
-        
+        }
+        else if (set_reuse(&sock) == -1)
+        {
+            close_socket(&sock);
+            perror("set_reuse");
+            continue;
+        }
+
         if (connect(sock, rp->ai_addr, rp->ai_addrlen) != -1)
             break;    
 
