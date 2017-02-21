@@ -10,7 +10,8 @@ typedef struct
     unsigned int num_of_clients;
     unsigned int max_requests;
     unsigned int num_of_threads;
-	int file_descriptor;
+    unsigned int msg_size;
+    int file_descriptor;
 } client_info;
 
 int start_client(client_info client_datas);
