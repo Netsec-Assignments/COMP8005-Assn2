@@ -19,6 +19,8 @@ Revisions:
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <sys/resource.h>
+#include <sys/time.h>
 
 #include "log.h"
 #include "server.h"
@@ -97,6 +99,16 @@ int main(int argc, char** argv)
         {0, 0, 0, 0},
     };
 
+    struct rlimit open_file_limit;
+    open_file_limit.rlim_cur = 131072;
+    open_file_limit.rlim_max = 131072;
+
+    if (setrlimit(RLIMIT_NOFILE, &open_file_limit) == -1)
+    {
+        perror("setrlimit");
+        exit(EXIT_FAILURE);
+    }
+
     if (argc > 1)
     {
         int c;
@@ -125,10 +137,12 @@ int main(int argc, char** argv)
                     if (strcmp(optarg, "epoll") == 0)
                     {
                         server = epoll_server;
+                        printf("epoll");
                     }
                     else if (strcmp(optarg, "select") == 0)
                     {
                         server = select_server;
+                        printf("select");
                     }
                     else if (strcmp(optarg, "thread") == 0)
                     {
@@ -176,7 +190,7 @@ int main(int argc, char** argv)
     {
         perror("close");
     }
-    fprintf(stderr, "Total served: %lu; Max concurrent connections: %lu", server->total_served, server->max_concurrent);
+    fprintf(stderr, "Total served: %lu; Max concurrent connections: %lu\n", server->total_served, server->max_concurrent);
     fflush(stderr);
 
     return ret;

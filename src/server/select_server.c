@@ -9,8 +9,8 @@
 #include <stdlib.h>
 #include <fcntl.h>
 #include <sys/types.h>
-#undef __FD_SETSIZE
-#define __FD_SETSIZE 131070
+// #undef __FD_SETSIZE
+// #define __FD_SETSIZE 65536
 #include <sys/select.h>
 #include <unistd.h>
 #include <sys/time.h>
@@ -23,6 +23,12 @@
 #include "acceptor.h"
 #include "protocol.h"
 #include "server.h"
+
+#define EXT_FD_SETSIZE 65536
+typedef struct
+{
+    long __fds_bits[EXT_FD_SETSIZE / 8 / sizeof(long)];
+} ext_fd_set;
 
 #define ACCEPT_PER_ITER 50
 #define BYTES_PER_ITER  2048
@@ -42,10 +48,11 @@ typedef struct
 
 typedef struct
 {
-    fd_set set;
+    ext_fd_set set;
     int max_fd;
     client_t clients[FD_SETSIZE];
     select_server_request requests[FD_SETSIZE];
+    size_t connected_count;
 } select_server_client_set;
 
 /**
@@ -55,9 +62,10 @@ typedef struct
  * @param sock The socket for the given client.
  * @return 0 on success, or -1 on failure.
  */
-static int handle_request(select_server_client_set* set, int sock)
+static int handle_request(server_t* server, int sock)
 {
     // TODO: Try to remove some of the return paths
+    select_server_client_set* set = (select_server_client_set*)server->private;
 
     int index = sock; // To make things a bit less confusing
     select_server_request* request = set->requests + index;
@@ -156,6 +164,7 @@ static int handle_request(select_server_client_set* set, int sock)
     return 0;
 
 cleanup:
+    --set->connected_count;
     if (result == 0)
     {
         // Success, so write results to file
@@ -170,7 +179,7 @@ cleanup:
         log_msg(csv);
 
         char pretty[256];
-        snprintf(pretty, 256, "Transfer time; %ldms; total bytes transferred: %ld; peer: %s:%hu\n",
+        snprintf(pretty, 256, "Transfer time; %ldus; total bytes transferred: %ld; peer: %s:%hu\n",
                  request->transfer_time, request->transferred, addr, src_port);
         printf("%s", pretty);
     }
@@ -194,7 +203,7 @@ cleanup:
 
 static void register_fds(fd_set* set, acceptor_t* acceptor, client_t* clients)
 {
-    FD_ZERO(set);
+    memset(set, 0, sizeof(ext_fd_set));//FD_ZERO(set);
     FD_SET(acceptor->sock, set);
     for (int i = 0; i < FD_SETSIZE; ++i)
     {
@@ -216,8 +225,10 @@ static int select_server_start(server_t* server, acceptor_t* acceptor, int* hand
         return -1;
     }
 
+    client_set->connected_count = 0;
+
     // Set accept socket to non-blocking mode
-    if (fcntl(acceptor->sock, F_SETFL, O_NONBLOCK) == -1)
+    if (fcntl(acceptor->sock, F_SETFL, O_NONBLOCK | fcntl(acceptor->sock, F_GETFL, 0)) == -1)
     {
         perror("fnctl");
         free(client_set);
@@ -235,16 +246,18 @@ static int select_server_start(server_t* server, acceptor_t* acceptor, int* hand
     client_set->max_fd = acceptor->sock;
     memset(client_set->requests, 0, FD_SETSIZE * sizeof(select_server_request));
 
-    FD_ZERO(&client_set->set);
+    memset(&client_set->set, 0, sizeof(ext_fd_set));
     FD_SET(acceptor->sock, &client_set->set);
 
     int num_selected;
     while(!atomic_load(&done))
     {
-        register_fds(&client_set->set, acceptor, client_set->clients);
+        register_fds((fd_set*)&client_set->set, acceptor, client_set->clients);
         //fd_set read_fds = client_set->set;
-
-        num_selected = select(client_set->max_fd + 1, &client_set->set, NULL, NULL, NULL);
+        struct timeval timeout;
+        timeout.tv_sec = 1;
+        num_selected = select(client_set->max_fd + 1, (fd_set*)&client_set->set, NULL, NULL, &timeout);
+        
         if (num_selected == -1)
         {
             if (errno != EINTR)
@@ -252,6 +265,10 @@ static int select_server_start(server_t* server, acceptor_t* acceptor, int* hand
                 perror("select");
             }
             break;
+        }else if(num_selected == 0)
+        {
+            printf("timed out\n");
+            continue;
         }
 
         // Check for new clients
@@ -259,7 +276,7 @@ static int select_server_start(server_t* server, acceptor_t* acceptor, int* hand
         {
             // Continue accepting clients until we would block
             int err = 0;
-            for (size_t i = 0; i < ACCEPT_PER_ITER; ++i)
+            while(1)
             {
                 client_t client;
                 int result = accept_client(acceptor, &client);
@@ -277,6 +294,8 @@ static int select_server_start(server_t* server, acceptor_t* acceptor, int* hand
                     {
                         err = 1;
                         break;
+                    }else{
+                        printf("addclient\n");
                     }
                 }
             }
@@ -291,7 +310,7 @@ static int select_server_start(server_t* server, acceptor_t* acceptor, int* hand
 
             if (client_set->clients[i].sock != -1 && FD_ISSET(client_set->clients[i].sock, &client_set->set))
             {
-                if (handle_request(client_set, client_set->clients[i].sock) == -1)
+                if (handle_request(server, client_set->clients[i].sock) == -1)
                 {
                     return -1;
                 }
@@ -304,14 +323,20 @@ static int select_server_start(server_t* server, acceptor_t* acceptor, int* hand
 
 static int select_server_add_client(server_t* server, client_t client)
 {
-    if (fcntl(client.sock, F_SETFL, O_NONBLOCK) == -1)
+    select_server_client_set* client_set = (select_server_client_set*)server->private;
+    
+    if (fcntl(client.sock, F_SETFL, O_NONBLOCK | fcntl(client.sock, F_GETFL, 0)) == -1)
     {
         perror("setsockopt");
         return -1;
     }
     ++server->total_served;
+    ++client_set->connected_count;
+    if (client_set->connected_count > server->max_concurrent)
+    {
+        server->max_concurrent = client_set->connected_count;
+    }
 
-    select_server_client_set* client_set = (select_server_client_set*)server->private;
     client_set->clients[client.sock] = client;
     if (client.sock > client_set->max_fd)
     {

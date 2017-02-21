@@ -166,10 +166,9 @@ static void* worker_func(void* void_params)
         log_msg(csv);
 
         char pretty[256];
-        snprintf(pretty, 256, "Transfer time; %ldms; total bytes transferred: %ld; peer: %s:%hu\n",
+        snprintf(pretty, 256, "Transfer time; %ldus; total bytes transferred: %ld; peer: %s:%hu\n",
                  request.stats.transfer_time, request.stats.transferred, addr_buf, src_port);
 
-        // I'm going to hell for this
         pthread_mutex_t* stdout_guard = &((thread_server_private*)thread_server->private)->stdout_guard;
         pthread_mutex_lock(stdout_guard);
         printf("%s", pretty);
@@ -430,6 +429,7 @@ FUNCTION
 static void thread_server_cleanup(server_t* thread_server)
 {
     thread_server_private* private = (thread_server_private*)thread_server->private;
+    pthread_mutex_destroy(&private->stdout_guard);
     vector_free(&private->worker_params_list); // The threads will free the individual elements... I hope
     atomic_store(&done, 1);
     free(private);

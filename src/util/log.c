@@ -144,6 +144,11 @@ int log_msg(char const *message)
     return 0;
 }
 
+int log_flush()
+{
+    return fsync(log_fd);
+}
+
 /*********************************************************************************************
 FUNCTION
 

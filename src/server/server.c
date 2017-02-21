@@ -22,18 +22,34 @@ Name:			server.c
 #include <string.h>
 #include <signal.h>
 #include <netdb.h>
-#include <acceptor.h>
+#include <stdlib.h>
 
 #include "done.h"
 #include "acceptor.h"
 #include "server.h"
+#include "log.h"
 
+static server_t* current_server; // The hacks just don't stop
 atomic_int done = 0;
 static __sig_atomic_t handled = 0;
 static void nonfatal_sighandler(int sig)
 {
     atomic_store(&done, 1);
     handled = 1;
+}
+
+static void fatal_sighandler(int sig)
+{
+    static char final_message[256];
+    snprintf(final_message, 256, "Total served: %lu; Max concurrent connections: %lu\n",
+             current_server->total_served, current_server->max_concurrent);
+
+    fputs(final_message, stdout);
+    fflush(stdout);
+
+    log_flush();
+    log_close();
+    exit(EXIT_FAILURE);
 }
 
 /*********************************************************************************************
@@ -62,15 +78,34 @@ FUNCTION
 *********************************************************************************************/
 int serve(server_t *server, unsigned short port)
 {
-    struct sigaction sa;
-    memset(&sa, 0, sizeof(struct sigaction));
-    sa.sa_handler = nonfatal_sighandler;
-    sigemptyset(&sa.sa_mask);
+    // >:(
+    current_server = server;
+
+    struct sigaction nonfatal_sa;
+    memset(&nonfatal_sa, 0, sizeof(struct sigaction));
+    nonfatal_sa.sa_handler = nonfatal_sighandler;
+    sigemptyset(&nonfatal_sa.sa_mask);
 
     // Set up signal handlers so that we can interrupt system calls on signal
-    sigaction(SIGQUIT, &sa, 0);
-    sigaction(SIGINT, &sa, 0);
-    sigaction(SIGTERM, &sa, 0);
+    sigaction(SIGQUIT, &nonfatal_sa, 0);
+    sigaction(SIGINT, &nonfatal_sa, 0);
+    sigaction(SIGSTOP, &nonfatal_sa, 0);
+ 
+    struct sigaction fatal_sa;
+    memset(&fatal_sa, 0, sizeof(struct sigaction));
+    fatal_sa.sa_handler = fatal_sighandler;
+    sigemptyset(&fatal_sa.sa_mask);
+   
+    // Set up signal handlers for fatal signals so that we can try to log everything
+    // These won't catch every case (and we're unlikely to get, say, SIGFPE), but they
+    // should be enough
+    sigaction(SIGTERM, &fatal_sa, 0);
+    sigaction(SIGSEGV, &fatal_sa, 0);
+    sigaction(SIGPIPE, &fatal_sa, 0);
+    sigaction(SIGFPE, &fatal_sa, 0);
+    sigaction(SIGBUS, &fatal_sa, 0);
+    sigaction(SIGABRT, &fatal_sa, 0);
+    sigaction(SIGTRAP, &fatal_sa, 0);
 
     server->total_served = 0;
     server->max_concurrent = 0;
@@ -117,7 +152,7 @@ int serve(server_t *server, unsigned short port)
         return -1;
     }
 
-    if (listen(acceptor.sock, 100) == -1)
+    if (listen(acceptor.sock, 256) == -1)
     {
         perror("listen");
         cleanup_acceptor(&acceptor);

@@ -41,7 +41,7 @@ Name:			epoll_server.c
 
 
 #define ACCEPT_PER_ITER 100
-#define NUM_EPOLL_EVENTS 256
+#define NUM_EPOLL_EVENTS 98304
 
 static int epoll_server_start(server_t* server, acceptor_t* acceptor, int* handles_accept);
 static int epoll_server_add_client(server_t* server, client_t client);
@@ -80,6 +80,7 @@ typedef struct
 {
     int epfd;
     vector_t epoll_clients;
+    size_t connected_count;
 } epoll_server_private;
 
 /**
@@ -89,8 +90,9 @@ typedef struct
  * @param sock The socket for the given client.
  * @return 0 on success, or -1 on failure.
  */
-static int handle_request(epoll_server_private* private, int sock)
+static int handle_request(server_t* server, int sock)
 {
+    epoll_server_private* private = (epoll_server_private*)server->private;
     epoll_server_client* client_list = (epoll_server_client*)private->epoll_clients.items;
     int index = sock; // To make things a bit less confusing
     epoll_server_client* epoll_client = client_list + index;
@@ -190,6 +192,8 @@ static int handle_request(epoll_server_private* private, int sock)
     return 0;
 
 cleanup:
+    --private->connected_count;
+
     if (result == 0)
     {
         // Success, so write results to file
@@ -204,7 +208,7 @@ cleanup:
         log_msg(csv);
 
         char pretty[256];
-        snprintf(pretty, 256, "Transfer time; %ldms; total bytes transferred: %ld; peer: %s:%hu\n",
+        snprintf(pretty, 256, "Transfer time; %ldus; total bytes transferred: %ld; peer: %s:%hu\n",
               request->transfer_time, request->transferred, addr, src_port);
         printf("%s", pretty);
     }
@@ -271,6 +275,8 @@ static int epoll_server_start(server_t* server, acceptor_t* acceptor, int* handl
         return -1;        
     }
 
+    priv->connected_count = 0;
+
     int result = vector_init(&priv->epoll_clients, sizeof(epoll_server_client), NUM_EPOLL_EVENTS);
     if (result == -1)
     {
@@ -304,11 +310,15 @@ static int epoll_server_start(server_t* server, acceptor_t* acceptor, int* handl
 
     while (1)
     {
-        epoll_ready = epoll_wait(priv->epfd, events, NUM_EPOLL_EVENTS, -1);
+        epoll_ready = epoll_wait(priv->epfd, events, NUM_EPOLL_EVENTS, 3000);
         if (epoll_ready == -1)
         {
             perror("epoll_wait");
             break;
+        }else if (epoll_ready == 0)
+        {
+            printf("timed out\n");
+            continue;
         }
         // printf("number of events ready: %d\n", epoll_ready);
         int index;
@@ -347,7 +357,7 @@ static int epoll_server_start(server_t* server, acceptor_t* acceptor, int* handl
             }
             else
             {
-                int request_result = handle_request(priv, events[index].data.fd);
+                int request_result = handle_request(server, events[index].data.fd);
                 if (request_result == -1)
                 {
                     err = 1;
@@ -383,6 +393,11 @@ static int epoll_server_add_client(server_t* server, client_t client)
         return -1;
     }
     ++server->total_served;
+    ++priv->connected_count;
+    if (priv->connected_count > server->max_concurrent)
+    {
+        server->max_concurrent = priv->connected_count;
+    }    
 
     epoll_server_client* clients = (epoll_server_client*)priv->epoll_clients.items;
     clients[client.sock].client = client;

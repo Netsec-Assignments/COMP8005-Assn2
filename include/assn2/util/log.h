@@ -24,6 +24,13 @@ int log_open(char const* name);
 int log_msg(char const *message);
 
 /**
+ * Tries to flush the current log contents immediately.
+ *
+ * @return 0 on success, -1 on failure with errno set appropriately.
+ */
+int log_flush();
+
+/**
  * Closes the log file.
  * @return 0 on success, -1 on failure. Not that you'll be checking it.
  */
