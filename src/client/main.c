@@ -483,52 +483,56 @@ FUNCTION
 *********************************************************************************************/
 int connect_to_server(const char *port, const char *ip)
 {
-    struct addrinfo hints;
-    struct addrinfo *result;
-    struct addrinfo *rp = NULL;
-
+    int done = 0;
     int sock = -1;
-
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-
-    if (getaddrinfo(ip, port, &hints, &result) != 0)
+    do
     {
-        perror("getaddrinfo");
-        return -1;
-    }
-        
-    for (rp = result; rp != NULL; rp = rp->ai_next)
-    {
-        sock = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-        
-        if (sock == -1)
+        struct addrinfo hints;
+        struct addrinfo *result;
+        struct addrinfo *rp = NULL;
+
+        memset(&hints, 0, sizeof(hints));
+        hints.ai_family = AF_INET;
+        hints.ai_socktype = SOCK_STREAM;
+
+        if (getaddrinfo(ip, port, &hints, &result) != 0)
         {
-            continue;
+            perror("getaddrinfo");
+            return -1;
         }
-        else if (set_reuse(&sock) == -1)
+            
+        for (rp = result; rp != NULL; rp = rp->ai_next)
         {
-            close_socket(&sock);
-            perror("set_reuse");
-            continue;
+            sock = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+            
+            if (sock == -1)
+            {
+                continue;
+            }
+            else if (set_reuse(&sock) == -1)
+            {
+                close_socket(&sock);
+                perror("set_reuse");
+                continue;
+            }
+
+            if (connect(sock, rp->ai_addr, rp->ai_addrlen) != -1)
+            {
+                done = 1;
+                break;
+            }
+
+            close(sock);
         }
-
-        if (connect(sock, rp->ai_addr, rp->ai_addrlen) != -1)
-            break;    
-
-        close(sock);
-    }
-    
-    if (rp == NULL)
-    {
-        perror("connect");
+        
         freeaddrinfo(result);
-        return -1;
-    }
-    
-    freeaddrinfo(result);
-    
+        if (rp == NULL && errno != EADDRNOTAVAIL)
+        {
+            perror("connect");
+            done = 1;
+        }
+    } while (!done);
+
     return sock;
 }
 
