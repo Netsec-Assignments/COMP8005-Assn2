@@ -86,7 +86,7 @@ Revisions:
 int main(int argc, char** argv)
 {
     unsigned short port = DEFAULT_PORT;
-    server_t* server = select_server;
+    server_t* server = epoll_server;
 
     char const* short_opts = "p:s:h";
     struct option long_opts[] =
@@ -176,6 +176,8 @@ int main(int argc, char** argv)
     {
         perror("close");
     }
+    fprintf(stderr, "Total served: %lu; Max concurrent connections: %lu", server->total_served, server->max_concurrent);
+    fflush(stderr);
 
     return ret;
 }

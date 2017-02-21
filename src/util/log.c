@@ -44,7 +44,7 @@ FUNCTION
     Return Values:
 	
     Description:
-    Handle the signal from the server
+    Flush all pending data to the log file and attempt to close it.
 
     Revisions:
 	(none)
@@ -71,7 +71,8 @@ FUNCTION
     name - name of the log file
 
     Return Values:
-	
+    0 on success, or -1 on failure (an error message is printed to stderr in this case).
+
     Description:
     Open a log file to write to.
 
@@ -105,9 +106,11 @@ FUNCTION
     message - Message to write to the file.
 
     Return Values:
+    0 on success, -1 if the write failed.
 	
     Description:
-    Create the log msg
+    Log a message to the file specified in log_open. Blocks if another thread is currently
+    logging.
 
     Revisions:
 	(none)

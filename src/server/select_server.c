@@ -10,7 +10,7 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #undef __FD_SETSIZE
-#define __FD_SETSIZE 32768
+#define __FD_SETSIZE 131070
 #include <sys/select.h>
 #include <unistd.h>
 #include <sys/time.h>
@@ -23,6 +23,9 @@
 #include "acceptor.h"
 #include "protocol.h"
 #include "server.h"
+
+#define ACCEPT_PER_ITER 50
+#define BYTES_PER_ITER  2048
 
 static int select_server_start(server_t* server, acceptor_t* acceptor, int* handles_accept);
 static int select_server_add_client(server_t* server, client_t client);
@@ -161,15 +164,15 @@ cleanup:
         request->transfer_time += TIME_DIFF(start, end);
 
         unsigned short src_port = ntohs(set->clients[index].peer.sin_port);
-        char csv[256];
         char *addr = inet_ntoa(set->clients[index].peer.sin_addr);
+        char csv[256];
         snprintf(csv, 256, "%ld,%ld,%s:%hu\n", request->transfer_time, request->transferred, addr, src_port);
         log_msg(csv);
 
         char pretty[256];
         snprintf(pretty, 256, "Transfer time; %ldms; total bytes transferred: %ld; peer: %s:%hu\n",
                  request->transfer_time, request->transferred, addr, src_port);
-        printf("%s\n", pretty);
+        printf("%s", pretty);
     }
     else
     {
@@ -180,7 +183,6 @@ cleanup:
     free(request->msg);
 
     // Reset everything for the next client
-    FD_CLR(sock, &set->set);
     request->msg = NULL;
     request->msg_size = 0;
     request->partial_msg_size = 0;
@@ -188,6 +190,19 @@ cleanup:
     request->transfer_time = 0;
     set->clients[index].sock = -1;
     return result;
+}
+
+static void register_fds(fd_set* set, acceptor_t* acceptor, client_t* clients)
+{
+    FD_ZERO(set);
+    FD_SET(acceptor->sock, set);
+    for (int i = 0; i < FD_SETSIZE; ++i)
+    {
+        if(clients[i].sock != -1)
+        {
+            FD_SET(clients[i].sock, set);
+        }
+    }
 }
 
 static int select_server_start(server_t* server, acceptor_t* acceptor, int* handles_accept)
@@ -226,27 +241,25 @@ static int select_server_start(server_t* server, acceptor_t* acceptor, int* hand
     int num_selected;
     while(!atomic_load(&done))
     {
-        fd_set read_fds = client_set->set;
+        register_fds(&client_set->set, acceptor, client_set->clients);
+        //fd_set read_fds = client_set->set;
 
-        num_selected = select(client_set->max_fd + 1, &read_fds, NULL, NULL, NULL);
+        num_selected = select(client_set->max_fd + 1, &client_set->set, NULL, NULL, NULL);
         if (num_selected == -1)
         {
-            // if (errno != EBADF)
-            // {
-                if (errno != EINTR)
-                {
-                    perror("select");
-                }
-                break;
-            // }
+            if (errno != EINTR)
+            {
+                perror("select");
+            }
+            break;
         }
 
         // Check for new clients
-        if(FD_ISSET(acceptor->sock, &read_fds))
+        if(FD_ISSET(acceptor->sock, &client_set->set))
         {
             // Continue accepting clients until we would block
             int err = 0;
-            while (1)
+            for (size_t i = 0; i < ACCEPT_PER_ITER; ++i)
             {
                 client_t client;
                 int result = accept_client(acceptor, &client);
@@ -276,7 +289,7 @@ static int select_server_start(server_t* server, acceptor_t* acceptor, int* hand
                 break;
             }
 
-            if (client_set->clients[i].sock != -1 && FD_ISSET(client_set->clients[i].sock, &read_fds))
+            if (client_set->clients[i].sock != -1 && FD_ISSET(client_set->clients[i].sock, &client_set->set))
             {
                 if (handle_request(client_set, client_set->clients[i].sock) == -1)
                 {
@@ -291,11 +304,12 @@ static int select_server_start(server_t* server, acceptor_t* acceptor, int* hand
 
 static int select_server_add_client(server_t* server, client_t client)
 {
-    if (fcntl(client.sock, F_SETFD, O_NONBLOCK) == -1)
+    if (fcntl(client.sock, F_SETFL, O_NONBLOCK) == -1)
     {
         perror("setsockopt");
         return -1;
     }
+    ++server->total_served;
 
     select_server_client_set* client_set = (select_server_client_set*)server->private;
     client_set->clients[client.sock] = client;
@@ -303,7 +317,7 @@ static int select_server_add_client(server_t* server, client_t client)
     {
         client_set->max_fd = client.sock;
     }
-    FD_SET(client.sock, &client_set->set);
+
 
     return 0;
 }
@@ -329,6 +343,8 @@ static server_t select_server_impl =
     select_server_start,
     select_server_add_client,
     select_server_cleanup,
+    0,
+    0,
     NULL
 };
 

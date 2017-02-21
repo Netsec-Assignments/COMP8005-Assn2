@@ -27,7 +27,12 @@ Name:			thread_server.c
 #include <unistd.h>
 #include <pthread.h>
 #include <client.h>
+#include <sys/time.h>
+#include <vector.h>
+#include <arpa/inet.h>
 
+#include "log.h"
+#include "timing.h"
 #include "vector.h"
 #include "ring_buffer.h"
 #include "done.h"
@@ -56,6 +61,7 @@ typedef struct
 {
     vector_t worker_params_list;
     ring_buffer_t client_backlog;
+    pthread_mutex_t stdout_guard;
 } thread_server_private;
 
 static int thread_server_start(server_t* server, acceptor_t* acceptor, int* handles_accept);
@@ -79,7 +85,8 @@ FUNCTION
     Return Values:
 	
     Description:
-    Create the serrver sockets that the will connect to the client and send/receive data.
+    Serves a single client request at a time, indicating to the main thread when it is no longer
+    busy.
 
     Revisions:
 	(none)
@@ -103,6 +110,11 @@ static void* worker_func(void* void_params)
 
         // Handle the new client
         thread_server_request request;
+        request.stats.transferred = 0;
+        request.stats.transfer_time = 0;
+
+        struct timeval start, end;
+        gettimeofday(&start, NULL);
 
         ssize_t read_result = read_data(params->client.sock, &request.msg_size, sizeof(request.msg_size));
         if (read_result == -1)
@@ -116,22 +128,23 @@ static void* worker_func(void* void_params)
             if (request.msg == NULL)
             {
                 atomic_store(&done, 1);
-                shutdown(params->client.sock, 0);
                 close(params->client.sock);
                 break;
             }
         }
-
-        request.stats.transferred = sizeof(uint32_t);
+        request.stats.transferred += sizeof(request.msg_size);
 
         // Continue reading from the client until we get size == 0
         while(1)
         {
             // Read all data, send it, then read the next message size
-            // TODO: Handle errors here
             read_data(params->client.sock, request.msg, request.msg_size);
             send_data(params->client.sock, request.msg, request.msg_size);
             read_data(params->client.sock, &request.msg_size, sizeof(request.msg_size));
+
+            request.stats.transferred += sizeof(request.msg_size);
+            request.stats.transferred += request.msg_size;
+
             if (request.msg_size == 0)
             {
                 break;
@@ -139,8 +152,28 @@ static void* worker_func(void* void_params)
         }
 
         free(request.msg);
-        shutdown(params->client.sock, 0);
         close(params->client.sock);
+
+        gettimeofday(&end, NULL);
+        request.stats.transfer_time = TIME_DIFF(start, end);
+
+        unsigned short src_port = ntohs(params->client.peer.sin_port);
+        char addr_buf[INET_ADDRSTRLEN];
+        inet_ntop(AF_INET, &params->client.peer.sin_addr, addr_buf, INET_ADDRSTRLEN);
+
+        char csv[256];
+        snprintf(csv, 256, "%ld,%ld,%s:%hu\n", request.stats.transfer_time, request.stats.transferred, addr_buf, src_port);
+        log_msg(csv);
+
+        char pretty[256];
+        snprintf(pretty, 256, "Transfer time; %ldms; total bytes transferred: %ld; peer: %s:%hu\n",
+                 request.stats.transfer_time, request.stats.transferred, addr_buf, src_port);
+
+        // I'm going to hell for this
+        pthread_mutex_t* stdout_guard = &((thread_server_private*)thread_server->private)->stdout_guard;
+        pthread_mutex_lock(stdout_guard);
+        printf("%s", pretty);
+        pthread_mutex_unlock(stdout_guard);
 
         atomic_store(&params->busy, 0);
     }
@@ -174,6 +207,8 @@ FUNCTION
 *********************************************************************************************/
 static void accept_loop(server_t* server, acceptor_t* acceptor)
 {
+    thread_server_private* private = (thread_server_private*)server->private;
+
     // Get clients from the acceptor and send them to an available thread
     while (1)
     {
@@ -187,6 +222,12 @@ static void accept_loop(server_t* server, acceptor_t* acceptor)
         if (server->add_client(server, next_client) == -1)
         {
             break;
+        }
+
+        ++server->total_served;
+        if (private->worker_params_list.size > server->max_concurrent)
+        {
+            server->max_concurrent = private->worker_params_list.size;
         }
     }
 }
@@ -227,7 +268,13 @@ int thread_server_start(server_t *thread_server, acceptor_t *acceptor, int *hand
         return -1;
     }
 
-    ring_buffer_init(&priv->client_backlog, &client_backlog_buf[0], CLIENT_BACKLOG_SIZE, sizeof(client_t));
+    if (pthread_mutex_init(&priv->stdout_guard, NULL) == -1)
+    {
+        perror("pthread_mutex_init");
+        return -1;
+    }
+
+    //ring_buffer_init(&priv->client_backlog, &client_backlog_buf[0], CLIENT_BACKLOG_SIZE, sizeof(client_t));
 
     if (vector_init(&priv->worker_params_list, sizeof(worker_params*), WORKER_POOL_SIZE) == -1)
     {
@@ -393,6 +440,8 @@ static server_t thread_server_impl =
     thread_server_start,
     thread_server_add_client,
     thread_server_cleanup,
+    0,
+    0,
     NULL
 };
 
