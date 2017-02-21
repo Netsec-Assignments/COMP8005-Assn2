@@ -1,3 +1,19 @@
+/*********************************************************************************************
+Name:			vector.c
+
+    Required:	vector.h
+
+    Developer:  Shane Spoor
+
+    Created On: 2017-02-17
+
+    Description:
+    This creates the vector that is used within the Servers, acts as a resizeable list.
+
+    Revisions:
+    (none)
+
+*********************************************************************************************/
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
@@ -5,6 +21,31 @@
 
 static const float VECTOR_GROWTH_RATE = 1.5;
 
+/*********************************************************************************************
+FUNCTION
+
+    Name:		vector_init
+
+    Prototype:	int vector_init(vector_t* vec, size_t item_size, size_t cap)
+
+    Developer:	Shane Spoor
+
+    Created On: 2017-02-17
+
+    Parameters:
+
+    Return Values:
+    vec - Vector 
+    item_size - the item size of the vector
+    cap - the cap size of the vector
+	
+    Description:
+    Initialize the vector.
+
+    Revisions:
+	(none)
+
+*********************************************************************************************/
 int vector_init(vector_t* vec, size_t item_size, size_t cap)
 {
     void* items;
@@ -21,6 +62,30 @@ int vector_init(vector_t* vec, size_t item_size, size_t cap)
     return 0;
 }
 
+/*********************************************************************************************
+FUNCTION
+
+    Name:		vector_create
+
+    Prototype:	vector_t* vector_create(size_t item_size, size_t cap)
+
+    Developer:	Shane Spoor
+
+    Created On: 2017-02-17
+
+    Parameters:
+
+    Return Values:
+    item_size - Vector size
+    cap - The total cap size
+	
+    Description:
+    Create the vector
+
+    Revisions:
+	(none)
+
+*********************************************************************************************/
 vector_t* vector_create(size_t item_size, size_t cap)
 {
     vector_t* vec = malloc(sizeof(vector_t));
@@ -31,6 +96,30 @@ vector_t* vector_create(size_t item_size, size_t cap)
     return vec;
 }
 
+/*********************************************************************************************
+FUNCTION
+
+    Name:		vector_remove_at
+
+    Prototype:	void vector_remove_at(vector_t* vec, unsigned i)
+
+    Developer:	Shane Spoor
+
+    Created On: 2017-02-17
+
+    Parameters:
+
+    Return Values:
+    vec - the vector
+    i - Position
+	
+    Description:
+    Delete from the vector at a specific position.
+
+    Revisions:
+	(none)
+
+*********************************************************************************************/
 void vector_remove_at(vector_t* vec, unsigned i)
 {
     unsigned char* items = (unsigned char*)vec->items;
@@ -49,6 +138,31 @@ void vector_remove_at(vector_t* vec, unsigned i)
     vec->size--;
 }
 
+/*********************************************************************************************
+FUNCTION
+
+    Name:		vector_insert_at
+
+    Prototype:	int vector_insert_at(vector_t* vec, void* item, unsigned i)
+
+    Developer:	Shane Spoor
+
+    Created On: 2017-02-17
+
+    Parameters:
+
+    Return Values:
+    vec - the vector
+    item - temp data
+    i - insert position
+	
+    Description:
+    Insert into the vector at a position.
+
+    Revisions:
+	(none)
+
+*********************************************************************************************/
 int vector_insert_at(vector_t* vec, void* item, unsigned i)
 {
     unsigned char* items;
@@ -84,11 +198,59 @@ int vector_insert_at(vector_t* vec, void* item, unsigned i)
     return 0;
 }
 
+/*********************************************************************************************
+FUNCTION
+
+    Name:		vector_push_back
+
+    Prototype:	int vector_push_back(vector_t* vec, void* item)
+
+    Developer:	Shane Spoor
+
+    Created On: 2017-02-17
+
+    Parameters:
+
+    Return Values:
+    vec - the vector
+    item - temp data
+	
+    Description:
+    Push back the vector.
+
+    Revisions:
+	(none)
+
+*********************************************************************************************/
 int vector_push_back(vector_t* vec, void* item)
 {
     return vector_insert_at(vec, item, vec->size);
 }
 
+/*********************************************************************************************
+FUNCTION
+
+    Name:		vector_resize
+
+    Prototype:	int vector_resize(vector_t* vec, size_t cap)
+
+    Developer:	Shane Spoor
+
+    Created On: 2017-02-17
+
+    Parameters:
+
+    Return Values:
+    vec - the vector
+    tmp - temp data
+	
+    Description:
+    Resize the vector
+
+    Revisions:
+	(none)
+
+*********************************************************************************************/
 int vector_resize(vector_t* vec, size_t cap)
 {
     void* new_items = realloc(vec->items, cap * vec->item_size);
@@ -98,6 +260,30 @@ int vector_resize(vector_t* vec, size_t cap)
     return 0;
 }
 
+/*********************************************************************************************
+FUNCTION
+
+    Name:		vector_reverse_no_alloc
+
+    Prototype:	void vector_reverse_no_alloc(vector_t vec, void* tmp)
+
+    Developer:	Shane Spoor
+
+    Created On: 2017-02-17
+
+    Parameters:
+
+    Return Values:
+    vec - the vector
+    tmp - temp data
+	
+    Description:
+    Reverses the vector with no allocation.
+
+    Revisions:
+	(none)
+
+*********************************************************************************************/
 void vector_reverse_no_alloc(vector_t* vec, void* tmp)
 {
     unsigned char* front;
@@ -112,6 +298,29 @@ void vector_reverse_no_alloc(vector_t* vec, void* tmp)
     }
 }
 
+/*********************************************************************************************
+FUNCTION
+
+    Name:		vector_reverse
+
+    Prototype:	int vector_reverse(vector_t const* vec)
+
+    Developer:	Shane Spoor
+
+    Created On: 2017-02-17
+
+    Parameters:
+
+    Return Values:
+    vec - the vector
+	
+    Description:
+    Reverses the vector
+
+    Revisions:
+	(none)
+
+*********************************************************************************************/
 int vector_reverse(vector_t* vec)
 {
     unsigned char* tmp;
@@ -139,6 +348,29 @@ int vector_reverse(vector_t* vec)
     return 0;
 }
 
+/*********************************************************************************************
+FUNCTION
+
+    Name:		vector_free
+
+    Prototype:	void vector_free(vector_t const* vec)
+
+    Developer:	Shane Spoor
+
+    Created On: 2017-02-17
+
+    Parameters:
+
+    Return Values:
+    vec - the vector
+	
+    Description:
+    Frees the vector
+
+    Revisions:
+	(none)
+
+*********************************************************************************************/
 void vector_free(vector_t const* vec)
 {
     free(vec->items);

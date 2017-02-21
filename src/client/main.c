@@ -346,7 +346,7 @@ void* clients(void* infos)
     char* buffer = 0;
     int data_received = 0;
     int request_time = 0;
-    char* msg_send = make_random_string(4096);
+    char* msg_send = make_random_string(1024);
     unsigned char msg_recv[4096];
     char result_info[512];
     client_info *data = (client_info *)infos;
