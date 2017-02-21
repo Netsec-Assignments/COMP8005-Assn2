@@ -298,7 +298,7 @@ int start_client(client_info client_datas)
             return -1;
         }
         pthread_detach(thread);
-        usleep(15000);
+        usleep(3000);
     }
  
     printf("All threads created, waiting for them to finish now...\n");
@@ -406,7 +406,7 @@ void* clients(void* infos)
         request_time += (end_time.tv_sec * 1000000 + end_time.tv_usec) -
                         (start_time.tv_sec * 1000000 + start_time.tv_usec);
         client_count++;
-        usleep(25000);
+        usleep(5000);
     }
     
     uint32_t send_final_size = 0;
