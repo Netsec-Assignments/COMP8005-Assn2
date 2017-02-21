@@ -1,6 +1,24 @@
-//
-// Created by shane on 2/13/17.
-//
+/*********************************************************************************************
+Name:			epoll_server.c
+
+    Required:	epoll_server.h	
+                acceptor.h
+                done.h
+                server.h
+                protocol.h
+
+    Developer:	Mat Siwoski/Shane Spoor
+
+    Created On: 2017-02-17
+
+    Description:
+    This is the epoll server. This file will deal with handling the epoll server connections
+    coming from the client.
+
+    Revisions:
+    (none)
+
+*********************************************************************************************/
 
 #include <errno.h>
 #include <fcntl.h>
@@ -43,6 +61,32 @@ typedef struct
     epoll_server_request requests[FD_SETSIZE];
 } epoll_server_client_set;
 
+/*********************************************************************************************
+FUNCTION
+
+    Name:		epoll_server_start
+
+    Prototype:	static int epoll_server_start(server_t* server, acceptor_t* acceptor, int* handles_accept)
+
+    Developer:	Mat Siwoski
+
+    Created On: 2017-02-17
+
+    Parameters:
+    server - server struct with server data
+    acceptor - acceptor struct with acceptor data
+    handles_accept - The number of handles to accept.
+
+    Return Values:
+	
+    Description:
+    This is the start of the epoll server. This will set up the connections and pass the data to another
+    function to handle the data.
+
+    Revisions:
+	(none)
+
+*********************************************************************************************/
 static int epoll_server_start(server_t* server, acceptor_t* acceptor, int* handles_accept)
 {
     *handles_accept = 1;

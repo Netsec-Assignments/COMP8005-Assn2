@@ -37,8 +37,8 @@ Name:			main.c
 #include "protocol.h"
 
 #define DEFAULT_PORT "8005"
-#define DEFAULT_IP "192.168.0.9"
-#define DEFAULT_NUMBER_CLIENTS 10000
+#define DEFAULT_IP "192.168.0.12"
+#define DEFAULT_NUMBER_CLIENTS 5000
 #define DEFAULT_MAXIMUM_REQUESTS 1
 #define NETWORK_BUFFER_SIZE 1024
 #define STACK_SIZE 65536
@@ -220,7 +220,7 @@ int main(int argc, char** argv)
         }
     }
 	
-    if((client_datas.file_descriptor = open("result.csv", O_WRONLY | O_CREAT | O_TRUNC | O_APPEND, 0777)) == -1)
+    if((client_datas.file_descriptor = open("result.txt", O_WRONLY | O_CREAT | O_TRUNC | O_APPEND, 0777)) == -1)
     {
         perror("open");
         return -1;
