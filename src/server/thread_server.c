@@ -1,6 +1,26 @@
-//
-// Created by shane on 2/13/17.
-//
+/*********************************************************************************************
+Name:			thread_server.c
+
+    Required:	vector.h
+                ring_buffer.h
+                done.h
+                server.h
+                protocol.h
+
+    Developer:  Shane Spoor
+
+    Created On: 2017-02-17
+
+    Description:
+    This is the threaded server application. This will create threads based off the number of 
+    sockets it receives and receives the data from the client and then echos it back to the 
+    client. This is a threaded echo server.
+
+    Revisions:
+    (none)
+
+*********************************************************************************************/
+
 #include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,7 +30,6 @@
 
 #include "vector.h"
 #include "ring_buffer.h"
-
 #include "done.h"
 #include "server.h"
 #include "protocol.h"
@@ -43,6 +62,29 @@ static int thread_server_start(server_t* server, acceptor_t* acceptor, int* hand
 static int thread_server_add_client(server_t* server, client_t client);
 static void thread_server_cleanup(server_t* server);
 
+/*********************************************************************************************
+FUNCTION
+
+    Name:		worker_func
+
+    Prototype:	static void* worker_func(void* void_params)
+
+    Developer:	Shane Spoor/Mat Siwoski
+
+    Created On: 2017-02-17
+
+    Parameters:
+    void_params - Params from the threaded server
+
+    Return Values:
+	
+    Description:
+    Create the serrver sockets that the will connect to the client and send/receive data.
+
+    Revisions:
+	(none)
+
+*********************************************************************************************/
 static void* worker_func(void* void_params)
 {
     worker_params* params = (worker_params*)void_params;
@@ -107,6 +149,29 @@ static void* worker_func(void* void_params)
     return NULL;
 }
 
+/*********************************************************************************************
+FUNCTION
+
+    Name:		worker_func
+
+    Prototype:	static void* worker_func(void* void_params)
+
+    Developer:	Shane Spoor/Mat Siwoski
+
+    Created On: 2017-02-17
+
+    Parameters:
+    void_params - Params from the threaded server
+
+    Return Values:
+	
+    Description:
+    Create the serrver sockets that the will connect to the client and send/receive data.
+
+    Revisions:
+	(none)
+
+*********************************************************************************************/
 static void accept_loop(server_t* server, acceptor_t* acceptor)
 {
     // Get clients from the acceptor and send them to an available thread
@@ -126,6 +191,31 @@ static void accept_loop(server_t* server, acceptor_t* acceptor)
     }
 }
 
+/*********************************************************************************************
+FUNCTION
+
+    Name:		thread_server_start
+
+    Prototype:	int thread_server_start(server_t *thread_server, acceptor_t *acceptor, int *handles_accept)
+
+    Developer:	Shane Spoor/Mat Siwoski
+
+    Created On: 2017-02-17
+
+    Parameters:
+    thread_server - pointer to the struct with server read_data
+    acceptor - Struct with acceptor information
+    handles_accept - handles the accept
+
+    Return Values:
+	
+    Description:
+    Starts the threaded server. 
+
+    Revisions:
+	(none)
+
+*********************************************************************************************/
 int thread_server_start(server_t *thread_server, acceptor_t *acceptor, int *handles_accept)
 {
     *handles_accept = 1;
@@ -196,6 +286,30 @@ int thread_server_start(server_t *thread_server, acceptor_t *acceptor, int *hand
     return 0;
 }
 
+/*********************************************************************************************
+FUNCTION
+
+    Name:		thread_server_add_client
+
+    Prototype:	static int thread_server_add_client(server_t* server, client_t client)
+
+    Developer:	Shane Spoor/Mat Siwoski
+
+    Created On: 2017-02-17
+
+    Parameters:
+    server - struct with server information
+    client - struct with client information
+
+    Return Values:
+	
+    Description:
+    Creates and adds the clients.
+
+    Revisions:
+	(none)
+
+*********************************************************************************************/
 static int thread_server_add_client(server_t* server, client_t client)
 {
     thread_server_private* private = (thread_server_private*)server->private;
@@ -243,6 +357,29 @@ static int thread_server_add_client(server_t* server, client_t client)
     return 0;
 }
 
+/*********************************************************************************************
+FUNCTION
+
+    Name:		thread_server_cleanup
+
+    Prototype:	static void thread_server_cleanup(server_t* thread_server)
+
+    Developer:	Shane Spoor/Mat Siwoski
+
+    Created On: 2017-02-17
+
+    Parameters:
+    thread_server - stack with server data
+
+    Return Values:
+	
+    Description:
+    Cleans up and free any sockets/file descriptors the server created.
+
+    Revisions:
+	(none)
+
+*********************************************************************************************/
 static void thread_server_cleanup(server_t* thread_server)
 {
     thread_server_private* private = (thread_server_private*)thread_server->private;

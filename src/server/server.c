@@ -1,6 +1,21 @@
-//
-// Created by shane on 2/17/17.
-//
+/*********************************************************************************************
+Name:			server.c
+
+    Required:	acceptor.h
+                done.h
+                server.h
+
+    Developer:  Shane Spoor
+
+    Created On: 2017-02-17
+
+    Description:
+    Generic function that handles the socket setup
+
+    Revisions:
+    (none)
+
+*********************************************************************************************/
 
 #include <stdio.h>
 #include <sys/socket.h>
@@ -21,6 +36,30 @@ static void nonfatal_sighandler(int sig)
     handled = 1;
 }
 
+/*********************************************************************************************
+FUNCTION
+
+    Name:		serve
+
+    Prototype:	int serve(server_t *server, unsigned short port)
+
+    Developer:	Shane Spoor/Mat Siwoski
+
+    Created On: 2017-02-17
+
+    Parameters:
+    server - Struct for the server data
+    port - port number for the server.
+
+    Return Values:
+	
+    Description:
+    Generic function used by the servers to connect to the client.
+
+    Revisions:
+	(none)
+
+*********************************************************************************************/
 int serve(server_t *server, unsigned short port)
 {
     struct sigaction sa;

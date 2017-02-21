@@ -37,8 +37,8 @@ Name:			main.c
 #include "protocol.h"
 
 #define DEFAULT_PORT "8005"
-#define DEFAULT_IP "192.168.0.9"
-#define DEFAULT_NUMBER_CLIENTS 10000
+#define DEFAULT_IP "192.168.0.12"
+#define DEFAULT_NUMBER_CLIENTS 5000
 #define DEFAULT_MAXIMUM_REQUESTS 1
 #define NETWORK_BUFFER_SIZE 1024
 #define STACK_SIZE 65536
@@ -220,7 +220,7 @@ int main(int argc, char** argv)
         }
     }
 	
-    if((client_datas.file_descriptor = open("result.csv", O_WRONLY | O_CREAT | O_TRUNC | O_APPEND, 0777)) == -1)
+    if((client_datas.file_descriptor = open("result.txt", O_WRONLY | O_CREAT | O_TRUNC | O_APPEND, 0777)) == -1)
     {
         perror("open");
         return -1;
@@ -298,9 +298,11 @@ int start_client(client_info client_datas)
             return -1;
         }
         pthread_detach(thread);
+        usleep(15000);
     }
  
     printf("All threads created, waiting for them to finish now...\n");
+    fflush(stdout);
     int old_remaining = client_datas.num_of_clients;
     int remaining;
     while(remaining = atomic_load_explicit(&thread_count, memory_order_relaxed))
@@ -346,7 +348,7 @@ void* clients(void* infos)
     char* buffer = 0;
     int data_received = 0;
     int request_time = 0;
-    char* msg_send = make_random_string(4096);
+    char* msg_send = make_random_string(1024);
     unsigned char msg_recv[4096];
     char result_info[512];
     client_info *data = (client_info *)infos;
@@ -404,6 +406,7 @@ void* clients(void* infos)
         request_time += (end_time.tv_sec * 1000000 + end_time.tv_usec) -
                         (start_time.tv_sec * 1000000 + start_time.tv_usec);
         client_count++;
+        usleep(25000);
     }
     
     uint32_t send_final_size = 0;
