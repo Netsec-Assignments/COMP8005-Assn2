@@ -400,19 +400,30 @@ void* clients(void* infos)
 
     for (int i = 0; i < data->max_requests; i++)
     {
+        if (i == 1)
+        {
+            printf("i is 1\n");
+        }
         gettimeofday(&start_time, NULL);
 
         uint32_t msg_send_size = (uint32_t)strlen(msg_send);
         if (send_data(sock, (char const*)&msg_send_size, sizeof(uint32_t)) == -1 ||
             send_data(sock, msg_send, strlen(msg_send)) == -1)
         {
-            continue;
+            perror("send_data");
+            break;
         }
 
         ssize_t bytes_read = read_data(sock, msg_recv, strlen(msg_send));
         if (bytes_read < 0)
         {
-            perror("read_data");
+            struct sockaddr_in in;
+            size_t len;
+            getsockname(sock, (struct sockaddr*)&in, (socklen_t*)&len);
+
+            char buf[128];
+            snprintf(buf, 128, "read_data (port %hu)", ntohs(in.sin_port));
+            perror(buf);
             break;
         }
 

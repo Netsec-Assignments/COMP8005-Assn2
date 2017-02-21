@@ -15,6 +15,7 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <arpa/inet.h>
+#include <client.h>
 
 #include "log.h"
 #include "timing.h"
@@ -159,18 +160,22 @@ cleanup:
         gettimeofday(&end, NULL);
         request->transfer_time += TIME_DIFF(start, end);
 
+        unsigned short src_port = ntohs(set->clients[index].peer.sin_port);
         char csv[256];
         char *addr = inet_ntoa(set->clients[index].peer.sin_addr);
-        snprintf(csv, 256, "%ld,%ld,%s\n", request->transfer_time, request->transferred, addr);
+        snprintf(csv, 256, "%ld,%ld,%s:%hu\n", request->transfer_time, request->transferred, addr, src_port);
         log_msg(csv);
 
         char pretty[256];
-        snprintf(pretty, 256, "Transfer time; %ldms; total bytes transferred: %ld; peer: %s\n",
-                 request->transfer_time, request->transferred, addr);
+        snprintf(pretty, 256, "Transfer time; %ldms; total bytes transferred: %ld; peer: %s:%hu\n",
+                 request->transfer_time, request->transferred, addr, src_port);
         printf("%s\n", pretty);
     }
+    else
+    {
+        perror("oops!");
+    }
 
-    shutdown(sock, 0);
     close(sock);
     free(request->msg);
 
@@ -197,7 +202,7 @@ static int select_server_start(server_t* server, acceptor_t* acceptor, int* hand
     }
 
     // Set accept socket to non-blocking mode
-    if (fcntl(acceptor->sock, F_SETFD, O_NONBLOCK) == -1)
+    if (fcntl(acceptor->sock, F_SETFL, O_NONBLOCK) == -1)
     {
         perror("fnctl");
         free(client_set);
@@ -239,23 +244,29 @@ static int select_server_start(server_t* server, acceptor_t* acceptor, int* hand
         // Check for new clients
         if(FD_ISSET(acceptor->sock, &read_fds))
         {
-            client_t client;
-            int result = accept_client(acceptor, &client);
-            if (result == -1)
+            // Continue accepting clients until we would block
+            int err = 0;
+            while (1)
             {
-                if (errno != EWOULDBLOCK)
+                client_t client;
+                int result = accept_client(acceptor, &client);
+                if (result == -1)
                 {
+                    if (errno != EWOULDBLOCK && errno != EAGAIN)
+                    {
+                        err = 1;
+                    }
                     break;
                 }
-            }
-            else
-            {
-                if (server->add_client(server, client) == -1)
+                else
                 {
-                    break;
+                    if (server->add_client(server, client) == -1)
+                    {
+                        err = 1;
+                        break;
+                    }
                 }
             }
-
         }
 
         for (int i = acceptor->sock + 1; i < FD_SETSIZE; ++i)
@@ -306,7 +317,6 @@ static void select_server_cleanup(server_t* server)
         if (client_set->clients[i].sock != -1)
         {
             // Technically we could just use i here, but w/e
-            shutdown(client_set->clients[i].sock, 0);
             close(client_set->clients[i].sock);
             free(client_set->requests[i].msg);
         }

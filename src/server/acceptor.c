@@ -8,6 +8,7 @@
 #include <netdb.h>
 #include <unistd.h>
 #include <errno.h>
+#include <fcntl.h>
 
 #include "done.h"
 #include "server.h"
@@ -19,12 +20,15 @@ int accept_client(acceptor_t* acceptor, client_t* out)
     int peer_sock = accept(acceptor->sock, (struct sockaddr*)&peer, &accepted_len);
     if (peer_sock < 0)
     {
-        if (errno != EINTR && errno != EWOULDBLOCK)
+        if (errno != EWOULDBLOCK && errno != EAGAIN)
         {
-            perror("accept");
-        }
+            atomic_store(&done, 1);
 
-        atomic_store(&done, 1); // TODO: This probably shouldn't be a thing for EWOULDBLOCk.
+            if (errno != EINTR)
+            {
+                perror("accept");
+            }
+        }
         return -1;
     }
 
