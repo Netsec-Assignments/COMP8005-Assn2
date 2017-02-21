@@ -17,6 +17,7 @@ typedef struct
 {
     struct sockaddr_in peer;
     size_t transferred;
+    time_t transfer_time;
 } client_stats_t;
 
 #endif //COMP8005_ASSN2_CLIENT_H

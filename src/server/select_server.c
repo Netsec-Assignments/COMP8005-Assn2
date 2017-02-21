@@ -163,17 +163,16 @@ cleanup:
         gettimeofday(&end, NULL);
         request->transfer_time += TIME_DIFF(start, end);
 
-        // unsigned short src_port = ntohs(set->clients[index].peer.sin_port);
-        // char *addr = inet_ntoa(set->clients[index].peer.sin_addr);
-        // char csv[256];
-        // snprintf(csv, 256, "%ld,%ld,%s:%hu\n", request->transfer_time, request->transferred, addr, src_port);
-        // fprintf(stderr, "%s", csv);
-        // //log_msg(csv);
+        unsigned short src_port = ntohs(set->clients[index].peer.sin_port);
+        char *addr = inet_ntoa(set->clients[index].peer.sin_addr);
+        char csv[256];
+        snprintf(csv, 256, "%ld,%ld,%s:%hu\n", request->transfer_time, request->transferred, addr, src_port);
+        log_msg(csv);
 
-        // char pretty[256];
-        // snprintf(pretty, 256, "Transfer time; %ldms; total bytes transferred: %ld; peer: %s:%hu\n",
-        //          request->transfer_time, request->transferred, addr, src_port);
-        // printf("%s", pretty);
+        char pretty[256];
+        snprintf(pretty, 256, "Transfer time; %ldms; total bytes transferred: %ld; peer: %s:%hu\n",
+                 request->transfer_time, request->transferred, addr, src_port);
+        printf("%s", pretty);
     }
     else
     {
@@ -184,7 +183,6 @@ cleanup:
     free(request->msg);
 
     // Reset everything for the next client
-    //FD_CLR(sock, &set->set);
     request->msg = NULL;
     request->msg_size = 0;
     request->partial_msg_size = 0;
@@ -311,6 +309,7 @@ static int select_server_add_client(server_t* server, client_t client)
         perror("setsockopt");
         return -1;
     }
+    ++server->total_served;
 
     select_server_client_set* client_set = (select_server_client_set*)server->private;
     client_set->clients[client.sock] = client;
@@ -318,7 +317,7 @@ static int select_server_add_client(server_t* server, client_t client)
     {
         client_set->max_fd = client.sock;
     }
-    //FD_SET(client.sock, &client_set->set);
+
 
     return 0;
 }
@@ -344,6 +343,8 @@ static server_t select_server_impl =
     select_server_start,
     select_server_add_client,
     select_server_cleanup,
+    0,
+    0,
     NULL
 };
 

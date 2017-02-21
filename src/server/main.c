@@ -176,6 +176,8 @@ int main(int argc, char** argv)
     {
         perror("close");
     }
+    fprintf(stderr, "Total served: %lu; Max concurrent connections: %lu", server->total_served, server->max_concurrent);
+    fflush(stderr);
 
     return ret;
 }

@@ -50,6 +50,10 @@ struct server_t
      */
     void (*cleanup)(server_t* server);
 
+    // Summary stats
+    size_t max_concurrent;
+    size_t total_served;
+
     // Data private to the server implementation (reference to thread pool, queue for receiving new clients, etc.)
     void* private;
 };

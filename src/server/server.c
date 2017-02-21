@@ -72,6 +72,9 @@ int serve(server_t *server, unsigned short port)
     sigaction(SIGINT, &sa, 0);
     sigaction(SIGTERM, &sa, 0);
 
+    server->total_served = 0;
+    server->max_concurrent = 0;
+
     acceptor_t acceptor;
 
     // Thanks Beej: http://beej.us/guide/bgnet/output/html/singlepage/bgnet.html#bind

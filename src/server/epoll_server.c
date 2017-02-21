@@ -28,7 +28,8 @@ Name:			epoll_server.c
 #include <string.h>
 #include <sys/epoll.h>
 #include <sys/time.h>
-#include <unistd.h> 
+#include <unistd.h>
+#include <arpa/inet.h>
 
 #include "log.h"
 #include "timing.h"
@@ -51,6 +52,8 @@ static server_t epoll_server_impl =
     epoll_server_start,
     epoll_server_add_client,
     epoll_server_cleanup,
+    0,
+    0,
     NULL
 };
 
@@ -194,17 +197,16 @@ cleanup:
         gettimeofday(&end, NULL);
         request->transfer_time += TIME_DIFF(start, end);
 
-        // unsigned short src_port = ntohs(set->clients[index].peer.sin_port);
-        // char *addr = inet_ntoa(set->clients[index].peer.sin_addr);
-        // char csv[256];
-        // snprintf(csv, 256, "%ld,%ld,%s:%hu\n", request->transfer_time, request->transferred, addr, src_port);
-        // fprintf(stderr, "%s", csv);
-        // //log_msg(csv);
+        unsigned short src_port = ntohs(epoll_client->client.peer.sin_port);
+        char *addr = inet_ntoa(epoll_client->client.peer.sin_addr);
+        char csv[256];
+        snprintf(csv, 256, "%ld,%ld,%s:%hu\n", request->transfer_time, request->transferred, addr, src_port);
+        log_msg(csv);
 
-        // char pretty[256];
-        // snprintf(pretty, 256, "Transfer time; %ldms; total bytes transferred: %ld; peer: %s:%hu\n",
-        //          request->transfer_time, request->transferred, addr, src_port);
-        // printf("%s", pretty);
+        char pretty[256];
+        snprintf(pretty, 256, "Transfer time; %ldms; total bytes transferred: %ld; peer: %s:%hu\n",
+              request->transfer_time, request->transferred, addr, src_port);
+        printf("%s", pretty);
     }
     else
     {
@@ -318,8 +320,8 @@ static int epoll_server_start(server_t* server, acceptor_t* acceptor, int* handl
                 while(1)//for (size_t i = 0; i < ACCEPT_PER_ITER; ++i)
                 {
                     client_t client;
-                    int result = accept_client(acceptor, &client);
-                    if (result == -1)
+                    int accept_result = accept_client(acceptor, &client);
+                    if (accept_result == -1)
                     {
                         if (errno != EWOULDBLOCK && errno != EAGAIN)
                         {
@@ -345,8 +347,8 @@ static int epoll_server_start(server_t* server, acceptor_t* acceptor, int* handl
             }
             else
             {
-                int result = handle_request(priv, events[index].data.fd);
-                if (result == -1)
+                int request_result = handle_request(priv, events[index].data.fd);
+                if (request_result == -1)
                 {
                     err = 1;
                     break;
@@ -380,9 +382,11 @@ static int epoll_server_add_client(server_t* server, client_t client)
         perror("epoll_ctl");
         return -1;
     }
+    ++server->total_served;
 
     epoll_server_client* clients = (epoll_server_client*)priv->epoll_clients.items;
     clients[client.sock].client = client;
+    return 0;
 }
 
 static void epoll_server_cleanup(server_t* epoll_server)
