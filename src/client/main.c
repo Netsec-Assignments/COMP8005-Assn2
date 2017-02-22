@@ -326,7 +326,7 @@ int start_client(client_info client_datas)
 
     for (count = 0; count < thread_count; count++)
     {
-	void* val;
+	    void* val;
         pthread_join(threads[count], &val);
     }
     return 1;
@@ -417,7 +417,7 @@ void* clients(void* infos)
             request_time += (end_time.tv_sec * 1000000 + end_time.tv_usec) -
                             (start_time.tv_sec * 1000000 + start_time.tv_usec);
             client_count++;
-            usleep(25000);
+            usleep(250000);
         }
         
         uint32_t send_final_size = 0;
